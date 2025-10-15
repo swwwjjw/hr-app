@@ -1,0 +1,10 @@
+version: "3.9"
+
+sevices:
+  api:
+    build:
+      context: .
+    image: superapi:latest
+    restart: always
+    ports:
+      - "8888:7777"
