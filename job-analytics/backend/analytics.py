@@ -8,7 +8,6 @@ except Exception:
     from hh_parser_ver2 import normalize_salary
 
 
-
 def salary_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     # Prefer already computed monthly averages if available, then fall back to API salary,
     # then to estimated monthly derived from per-shift mentions.

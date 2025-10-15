@@ -1,344 +1,4 @@
-from fastapi import FastAPI, Query
-from fastapi.responses import HTMLResponse
-from typing import Optional, List, Dict, Any
-import asyncio
-import os
-import json
-import hashlib
-import time
-from pathlib import Path
-import uvicorn
 
-try:
-    # When running as a package: `uvicorn backend.main:app ...`
-    from .hh_parser_ver2 import (
-        fetch_vacancies,
-        parse_vacancies,
-        enrich_with_descriptions,
-        normalize_salary,
-        fetch_resume_detail_api,
-        enrich_resumes_with_details,
-        parse_resumes,
-        fetch_resume_ids_by_query,
-    )
-    from .analytics import salary_stats, top_skills
-except Exception:  # ModuleNotFoundError when running with --app-dir backend
-    from hh_parser_ver2 import (
-        fetch_vacancies,
-        parse_vacancies,
-        enrich_with_descriptions,
-        normalize_salary,
-        fetch_resume_detail_api,
-        enrich_resumes_with_details,
-        parse_resumes,
-        fetch_resume_ids_by_query,
-    )
-    from analytics import salary_stats, top_skills
-
-app = FastAPI(title="Job Analytics API")
-
-# Root redirect to dashboard
-from fastapi.responses import RedirectResponse  # placed after app creation to preserve import order
-@app.get("/")
-async def root_redirect():
-    return RedirectResponse(url="/dashboard")
-
-# Cache disabled – no-op storage to avoid stale results during development
-cache: Dict[str, Dict[str, Any]] = {}
-CACHE_TTL = 0
-
-def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
-    """Generate a cache key from query parameters."""
-    params = {
-        "query": query,
-        "area": area,
-        "pages": pages,
-        "per_page": per_page,
-        **kwargs
-    }
-    # Sort keys for consistent hashing
-    param_str = json.dumps(params, sort_keys=True)
-    return hashlib.md5(param_str.encode()).hexdigest()
-
-def is_cache_valid(cache_entry: Dict[str, Any]) -> bool:
-    """Cache disabled: always invalid."""
-    return False
-
-def get_from_cache(cache_key: str) -> Optional[Any]:
-    """Cache disabled: always miss."""
-    return None
-
-def set_cache(cache_key: str, data: Any) -> None:
-    """Cache disabled: no-op."""
-    return None
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.get("/cache/info")
-async def cache_info():
-    """Cache is disabled."""
-    return {
-        "disabled": True,
-        "total_entries": 0,
-        "valid_entries": 0,
-        "expired_entries": 0,
-        "cache_ttl_seconds": 0,
-    }
-
-
-@app.post("/cache/clear")
-async def clear_cache():
-    """Cache is disabled; nothing to clear."""
-    return {"message": "Cache disabled; nothing to clear"}
-
-
-@app.get("/salary-validation")
-async def salary_validation(query: str = Query(...), area: int = Query(2), pages: int = Query(1, ge=1, le=5), per_page: int = Query(50, ge=1, le=100)):
-    """Validate salary parsing by showing raw salary data and normalized values."""
-    items = await fetch_vacancies(query=query, area=area, pages=pages, per_page=per_page)
-    
-    salary_samples = []
-    for item in items[:10]:  # Show first 10 items
-        raw_salary = item.get("salary")
-        normalized = normalize_salary(raw_salary)
-        salary_samples.append({
-            "id": item.get("id"),
-            "title": item.get("name"),
-            "raw_salary": raw_salary,
-            "normalized": normalized,
-            "employer": item.get("employer", {}).get("name")
-        })
-    
-    # Calculate stats
-    all_salaries = [normalize_salary(item.get("salary")) for item in items]
-    valid_salaries = [s for s in all_salaries if s is not None]
-    
-    return {
-        "query": query,
-        "area": area,
-        "total_items": len(items),
-        "items_with_salary": len(valid_salaries),
-        "salary_coverage": f"{len(valid_salaries)/len(items)*100:.1f}%" if items else "0%",
-        "salary_samples": salary_samples,
-        "salary_stats": salary_stats(items)
-    }
-
-
-@app.get("/employer-marks")
-async def employer_marks(query: str = Query(...), area: int = Query(2), pages: int = Query(1, ge=1, le=3), per_page: int = Query(20, ge=1, le=50)):
-    """Show employer marks computation details and performance."""
-    import time
-    start_time = time.time()
-    
-    items = await fetch_vacancies(query=query, area=area, pages=pages, per_page=per_page)
-    parsed = await parse_vacancies(items, with_employer_mark=True)
-    
-    end_time = time.time()
-    processing_time = round((end_time - start_time) * 1000, 2)
-    
-    # Show employer mark details
-    employer_details = []
-    for item in parsed[:10]:  # Show first 10
-        employer_details.append({
-            "employer_id": item.get("employer_id"),
-            "employer_name": item.get("employer_name"),
-            "employer_trusted": item.get("employer_trusted"),
-            "employer_mark": item.get("employer_mark"),
-            "salary_avg": item.get("salary_avg"),
-            "title": item.get("title")
-        })
-    
-    return {
-        "query": query,
-        "area": area,
-        "total_items": len(items),
-        "processing_time_ms": processing_time,
-        "employer_details": employer_details,
-        "note": "Employer marks (1-5 scale) computed from: trusted flag (40%), salary availability (30%), avg salary (20%), vacancy count (10%)"
-    }
-
-
-@app.get("/fetch")
-async def fetch(
-    query: str = Query(..., description="Search query, e.g. 'data scientist'"),
-    area: Optional[int] = Query(None),
-    pages: Optional[int] = Query(None),
-    per_page: int = Query(100, ge=1, le=100),
-    simplified: bool = Query(False),
-    employer_mark: bool = Query(False),
-    include_description: bool = Query(False),
-    fetch_all: bool = Query(True, description="If true, ignore 'pages' and fetch all available pages")
-):
-    # Generate cache key
-    cache_key = get_cache_key(query, area, pages, per_page, simplified=simplified, employer_mark=employer_mark, include_description=include_description)
-    
-    # Check cache first
-    cached_result = get_from_cache(cache_key)
-    if cached_result is not None:
-        return cached_result
-    
-    # Fetch data if not in cache
-    # If fetch_all, ignore client-specified pages and fetch everything available
-    effective_pages = None if fetch_all else pages
-    items = await fetch_vacancies(query=query, area=area, pages=effective_pages, per_page=per_page)
-    if include_description:
-        await enrich_with_descriptions(items)
-    if simplified:
-        parsed = await parse_vacancies(items, with_employer_mark=employer_mark)
-        result = {"count": len(parsed), "items": parsed}
-    else:
-        result = {"count": len(items), "items": items}
-    
-    # Store in cache
-    set_cache(cache_key, result)
-    return result
-
-
-@app.get("/analyze")
-async def analyze(
-    query: str = Query(...),
-    area: Optional[int] = Query(None),
-    pages: Optional[int] = Query(None),
-    per_page: int = Query(100, ge=1, le=100),
-    fetch_all: bool = Query(True, description="If true, ignore 'pages' and fetch all available pages")
-):
-    # Generate cache key for analyze endpoint
-    cache_key = get_cache_key(query, area, pages, per_page, endpoint="analyze")
-    
-    # Check cache first
-    cached_result = get_from_cache(cache_key)
-    if cached_result is not None:
-        return cached_result
-    
-    # Fetch and analyze data if not in cache
-    effective_pages = None if fetch_all else pages
-    items = await fetch_vacancies(query=query, area=area, pages=effective_pages, per_page=per_page)
-    # Use parsed vacancies so per-shift monthly estimates are considered
-    parsed_for_stats = await parse_vacancies(items, with_employer_mark=False)
-    salaries = salary_stats(parsed_for_stats)
-    skills = top_skills(items, top_n=20)
-    result = {"query": query, "area": area, "count": len(items), "salaries": salaries, "skills": skills}
-    
-    # Store in cache
-    set_cache(cache_key, result)
-    return result
-
-
-@app.get("/resume-stats")
-async def resume_stats(
-    resume_ids: List[str] = Query([], description="List of resume IDs to analyze (optional)"),
-    vacancy_query: str = Query(..., description="Vacancy search text for denominator"),
-    area: Optional[int] = Query(None),
-    pages: Optional[int] = Query(1, ge=1, le=5),
-    per_page: int = Query(50, ge=1, le=100),
-    oauth_token: Optional[str] = Query(None, description="Optional OAuth token for resume detail"),
-    auto_collect: bool = Query(True, description="Automatically collect resume IDs from vacancy search")
-):
-    """Compute statistics about active resumes and resumes per vacancy.
-    - Active resumes: count of resumes with recent `updated_at` (last 30 days) or available detail.
-    - Resumes per vacancy: active resumes divided by number of vacancies for `vacancy_query`.
-    - If no resume_ids provided and auto_collect=True, automatically search for relevant resumes.
-    """
-    import datetime as _dt
-
-    # Auto-collect resume IDs if none provided and auto_collect is enabled
-    if not resume_ids and auto_collect:
-        try:
-            auto_resume_ids = await fetch_resume_ids_by_query(
-                query=vacancy_query, 
-                area=area, 
-                pages=1,  # Limit to 1 page for performance
-                per_page=20  # Limit to 20 resumes for performance
-            )
-            resume_ids = auto_resume_ids
-        except Exception as e:
-            print(f"Error auto-collecting resume IDs: {e}")
-            resume_ids = []
-
-    # Build rough resume items from given IDs; enrich to get details/updated_at
-    resume_items: List[Dict[str, Any]] = [{"id": rid, "public_url": f"https://hh.ru/resume/{rid}"} for rid in resume_ids if rid]
-    
-    # For auto-collected resumes, create mock data since we can't access real resume details
-    if resume_items and auto_collect and not oauth_token:
-        import random
-        import datetime
-        
-        # Create mock resume data
-        for item in resume_items:
-            # Generate realistic mock data
-            days_ago = random.randint(1, 90)  # Resume updated 1-90 days ago
-            updated_date = datetime.datetime.utcnow() - datetime.timedelta(days=days_ago)
-            
-            item.update({
-                "title": f"Кандидат на позицию {vacancy_query}",
-                "updated_at": updated_date.isoformat() + "Z",
-                "area": {"name": "Санкт-Петербург"} if area == 2 else {"name": "Москва"},
-                "salary": None,
-                "key_skills": [{"name": skill} for skill in [
-                    "Работа в команде", "Ответственность", "Внимательность", 
-                    "Коммуникабельность", "Опыт работы"
-                ][:random.randint(2, 5)]]
-            })
-        
-        parsed_resumes = resume_items  # Use mock data directly
-    else:
-        # Use real resume enrichment for manually provided IDs or with OAuth
-        if resume_items:
-            await enrich_resumes_with_details(resume_items, prefer_scrape=False, oauth_token=oauth_token)
-        parsed_resumes = await parse_resumes(resume_items) if resume_items else []
-
-    # Determine activity: updated within last 30 days
-    now = _dt.datetime.utcnow()
-    cutoff = now - _dt.timedelta(days=30)
-
-    def _parse_dt(val: Optional[str]) -> Optional[_dt.datetime]:
-        if not val:
-            return None
-        try:
-            # ISO timestamps from API typically in UTC
-            return _dt.datetime.fromisoformat(val.replace("Z", "+00:00")).astimezone(_dt.timezone.utc).replace(tzinfo=None)
-        except Exception:
-            return None
-
-    active_list: List[Dict[str, Any]] = []
-    for r in parsed_resumes:
-        upd = _parse_dt(r.get("updated_at"))
-        if upd and upd >= cutoff:
-            active_list.append(r)
-
-    active_count = len(active_list)
-    total_resumes = len(parsed_resumes)
-
-    # Fetch vacancies for denominator
-    vacancies_raw = await fetch_vacancies(query=vacancy_query, area=area, pages=pages, per_page=per_page)
-    vacancies_parsed = await parse_vacancies(vacancies_raw, with_employer_mark=False)
-    vacancy_count = len(vacancies_parsed)
-
-    resumes_per_vacancy = (active_count / vacancy_count) if vacancy_count > 0 else None
-
-    return {
-        "input_resume_ids": resume_ids,
-        "vacancy_query": vacancy_query,
-        "area": area,
-        "total_resumes": total_resumes,
-        "active_resumes": active_count,
-        "active_share": (active_count / total_resumes) if total_resumes > 0 else None,
-        "vacancy_count": vacancy_count,
-        "resumes_per_vacancy": resumes_per_vacancy,
-        "active_samples": active_list[:10],
-    }
-
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    """Simple HTML dashboard that fetches /analyze and renders charts.
-    Query params are read from the browser URL: query, area, pages, per_page.
-    """
-    html = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -407,8 +67,8 @@ async def dashboard():
       font-size: 2rem;
     }
     h3 {
-      color: #80b9ff;
-      border-bottom: 2px solid rgba(128, 185, 255, 0.3);
+      color: #3b82f6;
+      border-bottom: 2px solid rgba(59, 130, 246, 0.3);
       padding-bottom: 8px;
       margin-bottom: 16px;
     }
@@ -536,8 +196,6 @@ async def dashboard():
       <option value="инспектор досмотр">Инспекторы по досмотру</option>
       <option value="инспектор перрон">Инспекторы перронного контроля</option>
       <option value="гбр, охрана">Инспектор ГБР</option>
-      <option value="врач терапевт">Врач-терапевт</option>
-      <option value="грузчик склад">Грузчик</option>
     </select>
     <button id="apply">Найти</button>
   </div>
@@ -553,8 +211,8 @@ async def dashboard():
       <div id="bandBelow" style="position:absolute; left:0; top:0; bottom:0; background:#94a3b8 !important; border-radius:24px 0 0 24px;"></div>
       <div id="bandIn" style="position:absolute; top:0; bottom:0; background:linear-gradient(135deg, #3b82f6, #1d4ed8);"></div>
       <div id="bandAbove" style="position:absolute; top:0; bottom:0; background:linear-gradient(135deg, #06b6d4, #0891b2); border-radius:0 24px 24px 0;"></div>
-             <div id="markerPulkovoLine" title="Пулково зарплата" style="position:absolute; top:0; bottom:0; width:4px; background:#ffffff; box-shadow:0 0 0 2px #3b82f6, 0 0 8px rgba(59,130,246,0.8), 0 0 16px rgba(59,130,246,0.4); border-radius:2px;"></div>
-      <div id="markerPulkovoLabel" style="position:absolute; top:52px; transform:translateX(-50%); color:#ffffff; font-weight:800; font-size:13px; white-space:nowrap; text-shadow:0 0 4px rgba(59,130,246,0.8), 0 0 8px rgba(59,130,246,0.6);"></div>
+             <div id="markerPulkovoLine" title="Пулково зарплата" style="position:absolute; top:0; bottom:0; width:3px; background:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,0.20);"></div>
+      <div id="markerPulkovoLabel" style="position:absolute; top:52px; transform:translateX(-50%); color:#3b82f6; font-weight:700; font-size:12px; white-space:nowrap;"></div>
     </div>
     <div id="marketTicks" style="display:flex; justify-content:space-between; font-size:14px; font-weight:500;">
       <div id="valP25" style="color:#94a3b8;">–</div>
@@ -574,26 +232,6 @@ async def dashboard():
       <div id="salaryText"></div>
     </div>
   </div>
-  <div class="row" style="margin-top:24px;">
-    <div class="card">
-      <h3>Статистика резюме</h3>
-      <div class="controls" style="margin-top:8px; display:none;">
-        <input id="resumeIds" placeholder="resume_ids (comma-separated)" />
-        <button id="applyResume">Обновить</button>
-      </div>
-      <div id="resumeStatsMeta" class="meta" style="color:#000000; font-weight: 500;"></div>
-      <div id="resumeStatsGrid" style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; margin-top:8px;"></div>
-      <div id="resumeStatsSummary" style="margin-top:16px; padding:12px; background:rgba(59, 130, 246, 0.1); border-radius:8px; border-left:4px solid #3b82f6; font-size:14px; line-height:1.5; color:#cbd5e1;">
-        <p style="margin:0 0 8px 0;"><strong>Анализ резюме:</strong> Статистика показывает соотношение активных и неактивных резюме по выбранной позиции.</p>
-        <p style="margin:0 0 8px 0;"><strong>Конкуренция:</strong> Количество резюме на вакансию помогает оценить уровень конкуренции среди кандидатов.</p>
-        <p style="margin:0;"><strong>Активность:</strong> Высокий процент активных резюме указывает на востребованность позиции на рынке труда.</p>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Распределение зарплат</h3>
-      <canvas id="salaryHistogram" height="200"></canvas>
-    </div>
-  </div>
   <div class="card" style="margin-top:24px;">
     <h3>Требования кандидатов</h3>
     <div id="horizontalBarChart" style="margin-top:16px;">
@@ -610,32 +248,17 @@ async def dashboard():
         <!-- Bars will be dynamically generated here -->
       </div>
     </div>
+  </div>
+  <div class="card" id="resumeStatsCard" style="margin-top:24px;">
+    <h3>Статистика резюме</h3>
+    <div class="controls" style="margin-top:8px; display:none;">
+      <input id="resumeIds" placeholder="resume_ids (comma-separated)" />
+      <button id="applyResume">Обновить</button>
     </div>
+    <div id="resumeStatsMeta" class="meta" style="color:#000000; font-weight: 500;"></div>
+    <div id="resumeStatsGrid" style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; margin-top:8px;"></div>
   </div>
   <script>
-    // Helper to strictly detect Pulkovo operator company in employer names
-    function isPulkovoEmployerName(name) {
-      const raw = (name || '').toString().toLowerCase();
-      // Remove quotes, dots, commas, extra spaces; strip common legal forms like «ооо»
-      const normalized = raw
-        .replace(/[«»"'`]/g, '')
-        .replace(/[\.,]/g, ' ')
-        .replace(/\bооо\b/g, '')
-        .replace(/\bzao\b|\boao\b|\bao\b/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      // Accepted exact normalized names
-      const accepted = new Set([
-        'аэропорт пулково',
-        'воздушные ворота северной столицы',
-        'аэропорт пулково (воздушные ворота северной столицы)'
-      ]);
-      if (accepted.has(normalized)) return true;
-      return (
-        normalized.includes('аэропорт пулково') &&
-        normalized.includes('воздушные ворота северной столицы')
-      );
-    }
     function getParams() {
       const sp = new URLSearchParams(window.location.search);
       const query = sp.get('query') || 'python developer';
@@ -664,11 +287,7 @@ async def dashboard():
         'инспектор досмотр': 'инспектор досмотр', 
         'инспектор перрон': 'инспектор перрон',
         'гбр, охрана': 'гбр, охрана',
-        'гбр охрана': 'гбр, охрана',
-        'врач терапевт': 'врач терапевт',
-        'врач-терапевт': 'врач терапевт',
-        'грузчик': 'грузчик склад',
-        'грузчик склад': 'грузчик склад'
+        'гбр охрана': 'гбр, охрана'
       };
       
       // Find matching preset
@@ -707,7 +326,6 @@ async def dashboard():
       url.searchParams.set('area', area);
       url.searchParams.set('pages', pages);
       url.searchParams.set('per_page', per_page);
-      url.searchParams.set('fetch_all', 'true');
 
       const analyzeStartTime = performance.now();
       const res = await fetch(url);
@@ -820,7 +438,6 @@ async def dashboard():
       fUrl.searchParams.set('per_page', String(per_page));
       fUrl.searchParams.set('simplified', 'true');
       fUrl.searchParams.set('employer_mark', 'true');
-      fUrl.searchParams.set('fetch_all', 'true');
       
       const bubbleStartTime = performance.now();
       const fres = await fetch(fUrl);
@@ -861,7 +478,7 @@ async def dashboard():
       const sAvg = salaries.length ? (salaries.reduce((a,b)=>a+b,0) / salaries.length) : null;
       // Average salary for Pulkovo employers
       const pulkovoSalaries = items
-        .filter(v => (isPulkovoEmployerName(v.employer_name)) && v.salary_per_shift !== true)
+        .filter(v => ((v.employer_name || '').toLowerCase().includes('пулково') || (v.employer_name || '').toLowerCase().includes('воздушные ворота')) && v.salary_per_shift !== true)
         .map(v => {
           if (typeof v.salary_avg === 'number') return v.salary_avg;
           if (v.salary && typeof v.salary === 'object') {
@@ -931,7 +548,8 @@ async def dashboard():
           } else if (typeof v.employer_trusted === 'boolean') {
             y = v.employer_trusted ? 1 : 0;
           }
-          const isPulkovo = isPulkovoEmployerName(v.employer_name);
+          const isPulkovo = (v.employer_name || '').toLowerCase().includes('пулково') || 
+                           (v.employer_name || '').toLowerCase().includes('воздушные ворота');
           
           return {
             x,
@@ -1173,9 +791,6 @@ async def dashboard():
         }
       });
 
-      // Create salary histogram
-      createSalaryHistogram(salaries, s);
-
       // Resume stats card - automatically collect resume IDs
       try {
         console.log('Loading resume stats for query:', query);
@@ -1214,7 +829,7 @@ async def dashboard():
           card.innerHTML = `
             <div style="font-size: 24px; margin-bottom: 8px;">${it.icon}</div>
             <div style="font-size:12px; color:#cbd5e1; margin-bottom:4px;">${it.label}</div>
-            <div style="font-size:18px; font-weight:bold; color:#60a5fa; text-shadow:0 0 4px rgba(96,165,250,0.5);">${it.value ?? '–'}</div>
+            <div style="font-size:18px; font-weight:bold; color:#3b82f6;">${it.value ?? '–'}</div>
           `;
           grid.appendChild(card);
         });
@@ -1235,10 +850,6 @@ async def dashboard():
       const presetMap = new Map([
         ['инспекторы гбр', 'гбр, охрана'],
         ['инспектор гбр', 'гбр, охрана'],
-        ['врач-терапевт', 'врач терапевт'],
-        ['врач терапевт', 'врач терапевт'],
-        ['грузчик', 'грузчик склад'],
-        ['грузчик склад', 'грузчик склад']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
@@ -1247,224 +858,8 @@ async def dashboard():
       }
     });
     
-    // Function to create salary histogram
-    function createSalaryHistogram(salaries, salaryStats) {
-      const histogramCanvas = document.getElementById('salaryHistogram');
-      if (!histogramCanvas) return;
-      
-      console.log('Creating histogram with', salaries.length, 'salaries');
-      
-      // Use salaries from API or generate mock data
-      let histogramSalaries = salaries.length > 0 ? salaries : [];
-      if (histogramSalaries.length === 0 && salaryStats && salaryStats.median) {
-        // Generate mock data based on stats
-        const avg = salaryStats.avg || 131234;
-        const median = salaryStats.median || 125000;
-        const min = salaryStats.min || 40000;
-        const max = salaryStats.max || 400000;
-        
-        histogramSalaries = [];
-        for (let i = 0; i < 50; i++) {
-          const random = Math.random();
-          let salary;
-          if (random < 0.3) {
-            salary = min + Math.random() * (median - min);
-          } else if (random < 0.7) {
-            salary = median + (Math.random() - 0.5) * (median * 0.2);
-          } else {
-            salary = median + Math.random() * (max - median);
-          }
-          histogramSalaries.push(Math.round(salary));
-        }
-      }
-      
-      if (histogramSalaries.length === 0) {
-        histogramCanvas.parentElement.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:32px;">Недостаточно данных для построения гистограммы</p>';
-        return;
-      }
-      
-      // Create salary bins (buckets)
-      const minSalary = Math.min(...histogramSalaries);
-      const maxSalary = Math.max(...histogramSalaries);
-      
-      // Ensure at least 4 bins by adjusting bin width
-      let binWidth = 50000; // 50k руб per bin
-      let numBins = Math.ceil((maxSalary - minSalary) / binWidth) + 1;
-      
-      // If we have fewer than 4 bins, reduce bin width
-      if (numBins < 4) {
-        binWidth = Math.ceil((maxSalary - minSalary) / 3);
-        numBins = 4;
-      }
-      
-      // Create bins
-      const bins = [];
-      const binLabels = [];
-      for (let i = 0; i < numBins; i++) {
-        const binStart = Math.floor(minSalary / binWidth) * binWidth + i * binWidth;
-        const binEnd = binStart + binWidth;
-        bins.push({ start: binStart, end: binEnd, count: 0 });
-        // Show range for better clarity
-        if (i === numBins - 1) {
-          binLabels.push((binStart / 1000).toFixed(0) + 'k+');
-        } else {
-          binLabels.push((binStart / 1000).toFixed(0) + 'k-' + (binEnd / 1000).toFixed(0) + 'k');
-        }
-      }
-      
-      // Fill bins with salary data
-      histogramSalaries.forEach(salary => {
-        const binIndex = Math.floor((salary - bins[0].start) / binWidth);
-        if (binIndex >= 0 && binIndex < bins.length) {
-          bins[binIndex].count++;
-        }
-      });
-      
-      // Find the median value for marking
-      const median = salaryStats?.median || 0;
-      
-      new Chart(histogramCanvas, {
-        type: 'bar',
-        data: {
-          labels: binLabels,
-          datasets: [{
-            label: 'Количество вакансий',
-            data: bins.map(bin => bin.count),
-            backgroundColor: 'rgba(59, 130, 246, 0.8)',
-            borderColor: 'rgba(59, 130, 246, 1)',
-            borderWidth: 1,
-            borderRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          layout: {
-            padding: {
-              top: 20
-            }
-          },
-          plugins: {
-            legend: {
-              display: false
-            },
-            tooltip: {
-              backgroundColor: 'rgba(30, 41, 59, 0.95)',
-              titleColor: '#ffffff',
-              bodyColor: '#cbd5e1',
-              borderColor: 'rgba(59, 130, 246, 0.5)',
-              borderWidth: 1,
-              padding: 12,
-              displayColors: false,
-              callbacks: {
-                title: function(context) {
-                  const binIndex = context[0].dataIndex;
-                  const bin = bins[binIndex];
-                  return (bin.start / 1000).toFixed(0) + 'k - ' + (bin.end / 1000).toFixed(0) + 'k₽';
-                },
-                label: function(context) {
-                  return 'Вакансий: ' + context.parsed.y;
-                },
-                afterLabel: function(context) {
-                  const binIndex = context.dataIndex;
-                  const bin = bins[binIndex];
-                  if (median >= bin.start && median < bin.end) {
-                    return '📊 Медиана: ' + Math.round(median).toLocaleString() + '₽';
-                  }
-                  return '';
-                }
-              }
-            }
-          },
-          animation: {
-            onComplete: function() {
-              const ctx = histogramCanvas.getContext('2d');
-              const chart = Chart.getChart(histogramCanvas);
-              if (!chart) return;
-              
-              chart.data.datasets.forEach((dataset, datasetIndex) => {
-                const meta = chart.getDatasetMeta(datasetIndex);
-                meta.data.forEach((element, index) => {
-                  const data = dataset.data[index];
-                  if (data > 0) {
-                    const x = element.x;
-                    const y = element.y - 8;
-                    
-                    ctx.save();
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    ctx.fillText(data.toString(), x, y);
-                    ctx.restore();
-                  }
-                });
-              });
-            }
-          },
-          scales: {
-            x: {
-              title: {
-                display: false
-              },
-              grid: {
-                display: false
-              },
-              ticks: {
-                color: '#cbd5e1',
-                font: {
-                  size: 11,
-                  weight: '400'
-                },
-                maxRotation: 0,
-                minRotation: 0
-              }
-            },
-            y: {
-              title: {
-                display: false
-              },
-              grid: {
-                color: 'rgba(148, 163, 184, 0.15)',
-                lineWidth: 1
-              },
-              ticks: {
-                color: '#cbd5e1',
-                font: {
-                  size: 11,
-                  weight: '400'
-                },
-                stepSize: 1
-              },
-              beginAtZero: true
-            }
-          }
-        }
-      });
-    }
-    
     load();
   </script>
   </div>
 </body>
 </html>
-"""
-    return HTMLResponse(content=html)
-
-
-@app.post("/fetch_save")
-async def fetch_and_save(query: str = Query(...), area: Optional[int] = Query(None), pages: int = Query(1, ge=1, le=20), per_page: int = Query(50, ge=1, le=100)):
-    """Fetch vacancies and save to data/ as JSON. Returns file path and count."""
-    items = await fetch_vacancies(query=query, area=area, pages=pages, per_page=per_page)
-    base_dir = Path(__file__).resolve().parent.parent / "data"
-    base_dir.mkdir(parents=True, exist_ok=True)
-    safe_query = "".join([c if c.isalnum() or c in ("-","_") else "-" for c in query.lower().strip()])
-    filename = f"vacancies_{safe_query}_area-{area if area is not None else 'any'}_p{pages}_pp{per_page}.json"
-    out_path = base_dir / filename
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump({"query": query, "area": area, "pages": pages, "per_page": per_page, "count": len(items), "items": items}, f, ensure_ascii=False, indent=2)
-    return {"saved_to": str(out_path), "count": len(items)}
-
-
-if __name__ == '__main__':
-     uvicorn.run(app, host="0.0.0.0", port=8000)
