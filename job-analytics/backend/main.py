@@ -819,4 +819,4 @@ async def fetch_and_save(query: str = Query(...), area: Optional[int] = Query(No
 
 
 if __name__ == '__main__':
-     uvicorn.run(app, host="0.0.0.0", port=7777)
+     uvicorn.run(app, host="0.0.0.0", port=7000)
