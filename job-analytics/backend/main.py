@@ -8,7 +8,7 @@ import hashlib
 import time
 from pathlib import Path
 import uvicorn
-
+from fastapi.middleware.cors import CORSMiddleware
 try:
     # When running as a package: `uvicorn backend.main:app ...`
     from .hh_parser_ver2 import (
@@ -36,6 +36,17 @@ except Exception:  # ModuleNotFoundError when running with --app-dir backend
     from analytics import salary_stats, top_skills
 
 app = FastAPI(title="Job Analytics API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:7000",
+        "http://178.72.129.154",        
+    ],
+    allow_credentials=True,
+    allow_methods=["*"], 
+    allow_headers=["*"],
+)
 
 # Root redirect to dashboard
 from fastapi.responses import RedirectResponse  # placed after app creation to preserve import order
