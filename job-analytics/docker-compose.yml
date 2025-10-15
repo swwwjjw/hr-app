@@ -15,11 +15,11 @@ services:
   backend:
     build:
       context: ./backend
-      networks:
-      - dev
+    networks:
+    - dev
 
   frontend:
     build:
       context: ./frontend
-      networks:
-      - dev
+    networks:
+    - dev
