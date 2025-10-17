@@ -53,9 +53,9 @@ export const App: React.FC = () => {
         borderRadius: '4px',
         width: '100%'
         }}>
-          <option value="">Выберите вакансию</option>
+          <option value="" style={{backgroundColor: '#1a1a1a', color: '#fff'}}>Выберите вакансию</option>
           {presets.map(p => (
-            <option key={p.value} value={p.value}>{p.label}</option>
+            <option key={p.value} value={p.value} style={{backgroundColor: '#1a1a1a', color: '#fff'}}>{p.label}</option>
           ))}
         </select>
         <button onClick={load} disabled={loading}>Найти</button>
