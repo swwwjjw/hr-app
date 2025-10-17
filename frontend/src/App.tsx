@@ -44,7 +44,15 @@ export const App: React.FC = () => {
       <div className="meta">📍 Санкт-Петербург</div>
 
       <div className="controls">
-        <select value={query} onChange={(e) => setQuery(e.target.value)}>
+        <select value={query} onChange={(e) => setQuery(e.target.value)} 
+        style={{
+        backgroundColor: '#1a1a1a',
+        color: '#fff',
+        border: '1px solid #333',
+        padding: '8px',
+        borderRadius: '4px',
+        width: '100%'
+        }}>
           <option value="">Выберите вакансию</option>
           {presets.map(p => (
             <option key={p.value} value={p.value}>{p.label}</option>

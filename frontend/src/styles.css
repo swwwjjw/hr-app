@@ -12,29 +12,6 @@ body {
 .miniCard { border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: #f9fafb; }
 .meta { color: #000; font-weight: 500; margin-bottom: 12px; }
 .controls { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-.controls input, .controls button { padding: 8px 10px; }
+.controls input, .controls button, .controls select { padding: 8px 10px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 @media (max-width: 900px) { .row { grid-template-columns: 1fr; } .grid4 { grid-template-columns: 1fr 1fr; } }
-.controls select {
-  background-color: #1a1a1a;
-  color: #fff;
-  border: 1px solid #333;
-  padding: 8px 10x;
-  border-radius: 4px;
-}
-
-.controls select option {
-  background-color: #1a1a1a;
-  color: #fff;
-}
-
-.controls select:focus {
-  outline: none;
-  border-color: #555;
-}
-
-
-
-
-
-
