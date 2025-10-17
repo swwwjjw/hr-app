@@ -456,7 +456,7 @@ async def dashboard():
       border-radius: 8px;
       border: 1px solid rgba(59, 130, 246, 0.3);
       background: rgba(255, 255, 255, 0.1);
-      color: #f1f5f9;
+      color: #000000;
       font-size: 14px;
       transition: all 0.3s ease;
     }
