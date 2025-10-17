@@ -12,6 +12,34 @@ body {
 .miniCard { border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: #f9fafb; }
 .meta { color: #000; font-weight: 500; margin-bottom: 12px; }
 .controls { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-.controls input, .controls button, .controls select { padding: 8px 10px; }
+.controls input, .controls button { padding: 8px 10px; }
+.controls select {
+  padding: 8px 10px;
+  background-color: var(--bg-dark);
+  color: var(--text-light);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23888' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  padding-right: 30px;
+  min-width: 200px;
+}
+
+.controls select option {
+  background-color: var(--bg-dark);
+  color: var(--text-light);
+  padding: 8px;
+}
+
+.controls select:focus {
+  outline: none;
+  border-color: #666;
+  box-shadow: 0 0 0 2px rgba(100, 100, 100, 0.2);
+}
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 @media (max-width: 900px) { .row { grid-template-columns: 1fr; } .grid4 { grid-template-columns: 1fr 1fr; } }
