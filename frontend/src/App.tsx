@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { fetchAnalyze, fetchResumeStats } from './api/client';
 import { SalaryBubbleChart } from './components/SalaryBubbleChart';
 import { SalaryStatsCard } from './components/SalaryStatsCard';
+import WordCloud from 'wordcloud';
 
 export const App: React.FC = () => {
   const [query, setQuery] = useState('контролер кпп');
