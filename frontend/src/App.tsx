@@ -47,7 +47,7 @@ export const App: React.FC = () => {
         <select value={query} onChange={(e) => setQuery(e.target.value)}>
           <option value="">Выберите вакансию</option>
           {presets.map(p => (
-            <option key={p.value} value={p.value} style={{backgroundColor:'#1a1a1a', color: '#fff'}}>{p.label}</option>
+            <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
           ))}
         </select>
         <button onClick={load} disabled={loading}>Найти</button>
