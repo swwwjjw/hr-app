@@ -596,8 +596,8 @@ async def dashboard():
       <div id="valMax" style="color:#06b6d4;">–</div>
     </div>
   </div>
-  <div class="row" style="margin-top: 32px; grid-template-columns: 2fr 1fr;">
-    <div class="card">
+  <div class="row" style="margin-top: 32px;">
+    <div class="card" style="grid-column: 1 / -1;">
       <h3>Зарплата vs Рейтинг работодателя</h3>
       <canvas id="bubbleChart" height="140"></canvas>
     </div>
