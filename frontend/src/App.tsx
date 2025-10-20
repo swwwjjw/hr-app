@@ -56,7 +56,7 @@ export const App: React.FC = () => {
 
       {data && (
         <div className="row">
-          <div className="card card-full">
+          <div className="card">
             <h3>Зарплата vs Рейтинг работодателя</h3>
             <SalaryBubbleChart items={data.items || []} />
           </div>
