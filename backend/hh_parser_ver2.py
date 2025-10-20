@@ -530,6 +530,32 @@ def extract_resume_fields(r: Dict[str, Any]) -> Dict[str, Any]:
     exp = r.get("experience") or detail.get("experience") or {}
     exp_name = exp.get("name") if isinstance(exp, dict) else (exp if isinstance(exp, str) else None)
 
+    # Attempt to extract human job-search status from item or API detail
+    def _as_status_text(val: Any) -> Optional[str]:
+        if isinstance(val, str):
+            txt = val.strip()
+            return txt if txt else None
+        if isinstance(val, dict):
+            for key in ("name", "title", "value", "label"):
+                v = val.get(key)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+        return None
+
+    status_candidates: List[Any] = [
+        r.get("job_search_status"),
+        r.get("status"),
+        detail.get("job_search_status"),
+        detail.get("search_status"),
+        detail.get("status"),
+    ]
+    job_search_status = None
+    for cand in status_candidates:
+        txt = _as_status_text(cand)
+        if txt:
+            job_search_status = txt
+            break
+
     return {
         "id": r.get("id"),
         "title": r.get("title") or detail.get("title"),
@@ -541,6 +567,7 @@ def extract_resume_fields(r: Dict[str, Any]) -> Dict[str, Any]:
         "skills": skills_unique if skills_unique else None,
         "experience": exp_name,
         "resume_text": r.get("resume_text"),
+        "job_search_status": job_search_status,
     }
 
 
