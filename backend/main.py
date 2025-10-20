@@ -269,7 +269,8 @@ async def resume_stats(
     auto_collect: bool = Query(True, description="Automatically collect resume IDs from vacancy search")
 ):
     """Compute statistics about active resumes and resumes per vacancy.
-    - Active resumes: count of resumes with recent `updated_at` (last 30 days) or available detail.
+    - Active resumes: count of resumes whose job search status indicates activity.
+      Specifically, status text contains "Активно ищу работу" or "Рассматриваю предложения".
     - Resumes per vacancy: active resumes divided by number of vacancies for `vacancy_query`.
     - If no resume_ids provided and auto_collect=True, automatically search for relevant resumes.
     """
@@ -302,6 +303,16 @@ async def resume_stats(
             # Generate realistic mock data
             days_ago = random.randint(1, 90)  # Resume updated 1-90 days ago
             updated_date = datetime.datetime.utcnow() - datetime.timedelta(days=days_ago)
+            # Mock job-search status
+            possible_statuses = [
+                "Активно ищу работу",
+                "Рассматриваю предложения",
+                "Не ищу работу",
+                "Откликнусь на интересные предложения",
+            ]
+            # Bias towards active statuses a bit so stats are informative
+            weights = [0.35, 0.35, 0.15, 0.15]
+            status_choice = random.choices(possible_statuses, weights=weights, k=1)[0]
             
             item.update({
                 "title": f"Кандидат на позицию {vacancy_query}",
@@ -313,6 +324,10 @@ async def resume_stats(
                     "Коммуникабельность", "Опыт работы"
                 ][:random.randint(2, 5)]]
             })
+            # Provide text fields so status-based detection works without OAuth
+            item["resume_text"] = f"Статус: {status_choice}. Опыт работы, навыки и другие разделы резюме."
+            # Also include an explicit field for downstream parsers
+            item["job_search_status"] = status_choice
         
         parsed_resumes = resume_items  # Use mock data directly
     else:
@@ -321,24 +336,30 @@ async def resume_stats(
             await enrich_resumes_with_details(resume_items, prefer_scrape=False, oauth_token=oauth_token)
         parsed_resumes = await parse_resumes(resume_items) if resume_items else []
 
-    # Determine activity: updated within last 30 days
-    now = _dt.datetime.utcnow()
-    cutoff = now - _dt.timedelta(days=30)
+    # Determine activity by job-search status phrases
+    ACTIVE_STATUS_PHRASES = [
+        "активно ищу работу",
+        "рассматриваю предложения",
+    ]
 
-    def _parse_dt(val: Optional[str]) -> Optional[_dt.datetime]:
-        if not val:
-            return None
-        try:
-            # ISO timestamps from API typically in UTC
-            return _dt.datetime.fromisoformat(val.replace("Z", "+00:00")).astimezone(_dt.timezone.utc).replace(tzinfo=None)
-        except Exception:
-            return None
+    def _has_active_status(resume: Dict[str, Any]) -> bool:
+        """Return True if resume contains one of the active status phrases.
+        Checks explicit field `job_search_status` first, then falls back to `resume_text`/`title`.
+        """
+        # Prefer structured field if present
+        status_val = (resume.get("job_search_status") or "").strip().casefold()
+        if status_val and any(p in status_val for p in ACTIVE_STATUS_PHRASES):
+            return True
+        # Fallback to aggregated text search
+        blob = " ".join([
+            str(resume.get("resume_text") or ""),
+            str(resume.get("title") or ""),
+        ]).strip().casefold()
+        if not blob:
+            return False
+        return any(p in blob for p in ACTIVE_STATUS_PHRASES)
 
-    active_list: List[Dict[str, Any]] = []
-    for r in parsed_resumes:
-        upd = _parse_dt(r.get("updated_at"))
-        if upd and upd >= cutoff:
-            active_list.append(r)
+    active_list: List[Dict[str, Any]] = [r for r in parsed_resumes if _has_active_status(r)]
 
     active_count = len(active_list)
     total_resumes = len(parsed_resumes)
