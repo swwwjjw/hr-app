@@ -204,6 +204,10 @@ def extract_vacancy_fields(v: Dict[str, Any]) -> Dict[str, Any]:
     # Do NOT substitute per-shift estimate into salary_avg; leave None to exclude
     salary_avg_final: Optional[float] = salary_avg_base
 
+    # Extract schedule information
+    schedule_obj = v.get("schedule") or {}
+    schedule_name = schedule_obj.get("name") if schedule_obj else None
+    
     return {
         "id": v.get("id"),
         "title": title,
@@ -220,6 +224,7 @@ def extract_vacancy_fields(v: Dict[str, Any]) -> Dict[str, Any]:
         "employer_id": employer.get("id"),
         "employer_name": employer.get("name"),
         "employer_trusted": employer.get("trusted"),
+        "schedule": schedule_name,
     }
 
 
@@ -572,8 +577,16 @@ async def enrich_with_descriptions(items: List[Dict[str, Any]], prefer_scrape: b
 async def parse_vacancies(items: List[Dict[str, Any]], with_employer_mark: bool = False) -> List[Dict[str, Any]]:
     """Produce simplified vacancy dicts with selected fields.
     If with_employer_mark, compute employer marks from available data (fast approach).
+    Excludes vacancies with "Вахтовый метод" schedule.
     """
-    parsed = [extract_vacancy_fields(v) for v in items]
+    parsed = []
+    for v in items:
+        # Extract fields first to get schedule information
+        parsed_item = extract_vacancy_fields(v)
+        # Filter out vacancies with "Вахтовый метод" schedule
+        if parsed_item.get("schedule") != "Вахтовый метод":
+            parsed.append(parsed_item)
+    
     if with_employer_mark:
         # Use only fast computed marks (no web scraping)
         computed = compute_employer_marks(parsed)

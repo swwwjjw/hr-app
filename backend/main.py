@@ -21,7 +21,7 @@ try:
         parse_resumes,
         fetch_resume_ids_by_query,
     )
-    from .analytics import salary_stats, top_skills
+    from .analytics import salary_stats, top_skills, hourly_rate_stats
 except Exception:  # ModuleNotFoundError when running with --app-dir backend
     from hh_parser_ver2 import (
         fetch_vacancies,
@@ -33,7 +33,7 @@ except Exception:  # ModuleNotFoundError when running with --app-dir backend
         parse_resumes,
         fetch_resume_ids_by_query,
     )
-    from analytics import salary_stats, top_skills
+    from analytics import salary_stats, top_skills, hourly_rate_stats
 
 app = FastAPI(title="Job Analytics API")
 
@@ -198,11 +198,20 @@ async def fetch(
     items = await fetch_vacancies(query=query, area=area, pages=effective_pages, per_page=per_page)
     if include_description:
         await enrich_with_descriptions(items)
+    
+    # Filter out vacancies with "Вахтовый метод" schedule from raw items
+    filtered_items = []
+    for item in items:
+        schedule_obj = item.get("schedule") or {}
+        schedule_name = schedule_obj.get("name") if schedule_obj else None
+        if schedule_name != "Вахтовый метод":
+            filtered_items.append(item)
+    
     if simplified:
-        parsed = await parse_vacancies(items, with_employer_mark=employer_mark)
+        parsed = await parse_vacancies(filtered_items, with_employer_mark=employer_mark)
         result = {"count": len(parsed), "items": parsed}
     else:
-        result = {"count": len(items), "items": items}
+        result = {"count": len(filtered_items), "items": filtered_items}
     
     # Store in cache
     set_cache(cache_key, result)
@@ -228,11 +237,21 @@ async def analyze(
     # Fetch and analyze data if not in cache
     effective_pages = None if fetch_all else pages
     items = await fetch_vacancies(query=query, area=area, pages=effective_pages, per_page=per_page)
+    
+    # Filter out vacancies with "Вахтовый метод" schedule from raw items
+    filtered_items = []
+    for item in items:
+        schedule_obj = item.get("schedule") or {}
+        schedule_name = schedule_obj.get("name") if schedule_obj else None
+        if schedule_name != "Вахтовый метод":
+            filtered_items.append(item)
+    
     # Use parsed vacancies so per-shift monthly estimates are considered
-    parsed_for_stats = await parse_vacancies(items, with_employer_mark=False)
+    parsed_for_stats = await parse_vacancies(filtered_items, with_employer_mark=False)
     salaries = salary_stats(parsed_for_stats)
-    skills = top_skills(items, top_n=20)
-    result = {"query": query, "area": area, "count": len(items), "salaries": salaries, "skills": skills}
+    hourly_rates = hourly_rate_stats(parsed_for_stats)
+    skills = top_skills(filtered_items, top_n=20)
+    result = {"query": query, "area": area, "count": len(filtered_items), "salaries": salaries, "hourly_rates": hourly_rates, "skills": skills}
     
     # Store in cache
     set_cache(cache_key, result)
@@ -548,7 +567,10 @@ async def dashboard():
       <option value="инспектор перрон">Инспекторы перронного контроля</option>
       <option value="гбр, охрана">Инспектор ГБР</option>
       <option value="врач терапевт">Врач-терапевт</option>
-      <option value="грузчик склад">Грузчик</option>
+              <option value="грузчик склад">Грузчик</option>
+              <option value="водитель категория D">Водитель</option>
+              <option value="водитель категория С">Водитель спецтехники</option>
+              <option value="уборщик клининг">Уборщик</option>
     </select>
     <button id="apply">Найти</button>
   </div>
@@ -582,12 +604,11 @@ async def dashboard():
     <div class="card">
       <h3>Статистика зарплат</h3>
       <div id="salaryIcons" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 0;"></div>
-      <div id="salaryText"></div>
     </div>
   </div>
   <div class="row" style="margin-top:24px;">
     <div class="card">
-      <h3>Статистика резюме</h3>
+      <h3>Статистика резюме и ЧТС</h3>
       <div class="controls" style="margin-top:8px; display:none;">
         <input id="resumeIds" placeholder="resume_ids (comma-separated)" />
         <button id="applyResume">Обновить</button>
@@ -596,7 +617,7 @@ async def dashboard():
       <div id="resumeStatsGrid" style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; margin-top:8px;"></div>
       <div id="resumeStatsSummary" style="margin-top:16px; padding:12px; background:rgba(59, 130, 246, 0.1); border-radius:8px; border-left:4px solid #3b82f6; font-size:14px; line-height:1.5; color:#cbd5e1;">
         <p style="margin:0 0 8px 0;"><strong>Анализ резюме:</strong> Статистика показывает соотношение активных и неактивных резюме по выбранной позиции.</p>
-        <p style="margin:0 0 8px 0;"><strong>Конкуренция:</strong> Количество резюме на вакансию помогает оценить уровень конкуренции среди кандидатов.</p>
+        <p style="margin:0 0 8px 0;"><strong>Часовая ставка (ЧТС):</strong> Средняя и диапазон часовых тарифных ставок рассчитываются как зарплата ÷ 164 часа (среднее количество рабочих часов в месяц).</p>
         <p style="margin:0;"><strong>Активность:</strong> Высокий процент активных резюме указывает на востребованность позиции на рынке труда.</p>
       </div>
     </div>
@@ -669,7 +690,7 @@ async def dashboard():
       const presets = document.getElementById('presets');
       const normalizedQuery = query.toLowerCase().trim();
       
-      // Map queries to preset values
+      // Map queries to preset values (order matters - more specific first)
       const queryToPreset = {
         'контролер кпп': 'контролер кпп',
         'инспектор досмотр': 'инспектор досмотр', 
@@ -678,8 +699,14 @@ async def dashboard():
         'гбр охрана': 'гбр, охрана',
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
+        'грузчик склад': 'грузчик склад',
         'грузчик': 'грузчик склад',
-        'грузчик склад': 'грузчик склад'
+        'водитель категория С': 'водитель категория С',
+        'водитель спецтехники': 'водитель категория С',
+        'водитель категория D': 'водитель категория D',
+        'водитель': 'водитель категория D',
+        'уборщик клининг': 'уборщик клининг',
+        'уборщик': 'уборщик клининг'
       };
       
       // Find matching preset
@@ -820,7 +847,6 @@ async def dashboard():
         
         salaryIcons.appendChild(iconDiv);
       });
-      
 
 
       // Bubble chart: fetch simplified items including employer marks
@@ -913,10 +939,6 @@ async def dashboard():
           pulkovoLabel.style.display = 'none';
         }
 
-        document.getElementById('valP25').innerText = Math.round(p25).toLocaleString();
-        document.getElementById('valP50').innerText = Math.round(p50).toLocaleString();
-        document.getElementById('valP75').innerText = Math.round(p75).toLocaleString();
-        document.getElementById('valMax').innerText = Math.round(sMax).toLocaleString();
       } else {
         scaleEl.innerHTML = '<div style="padding:8px; color:#6b7280;">Недостаточно данных для расчёта</div>';
       }
@@ -943,11 +965,12 @@ async def dashboard():
             y = v.employer_trusted ? 1 : 0;
           }
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
+          const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
           
           return {
             x,
             y,
-            r: isPulkovo ? 12 : 6, // Larger bubble for Pulkovo
+            r: isPulkovo ? 12 : (isRossiya ? 12 : 6), // Larger bubble for Pulkovo and Rossiya
             title: v.title || '',
             employer: v.employer_name || '',
             isPulkovo: isPulkovo
@@ -1050,9 +1073,31 @@ async def dashboard():
         });
       }
       const bubbleCtx = document.getElementById('bubbleChart');
-      // Separate Pulkovo and other companies
+      // Separate companies into different datasets
       const pulkovoPoints = points.filter(p => p.isPulkovo);
-      const otherPoints = points.filter(p => !p.isPulkovo);
+      const rossiyaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Россия'));
+      const otherPoints = points.filter(p => !p.isPulkovo && !(p.employer && p.employer.includes('Авиакомпания Россия')));
+      
+      console.log('Chart datasets:', {
+        totalPoints: points.length,
+        pulkovoCount: pulkovoPoints.length,
+        rossiyaCount: rossiyaPoints.length,
+        otherCount: otherPoints.length,
+        rossiyaSample: rossiyaPoints.slice(0, 2)
+      });
+      
+      // Debug: Check if rossiyaPoints have valid data
+      if (rossiyaPoints.length > 0) {
+        console.log('Rossiya points details:', rossiyaPoints.map(p => ({
+          title: p.title,
+          employer: p.employer,
+          x: p.x,
+          y: p.y,
+          r: p.r
+        })));
+      } else {
+        console.log('No Rossiya points found!');
+      }
       
       new Chart(bubbleCtx, {
         type: 'bubble',
@@ -1061,22 +1106,32 @@ async def dashboard():
             {
               label: 'Другие компании',
               data: otherPoints,
-              backgroundColor: 'rgba(59, 130, 246, 0.7)',
-              borderColor: 'rgba(59, 130, 246, 1)',
-              borderWidth: 2,
-              hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)',
+              backgroundColor: 'rgba(59, 130, 246, 0.4)',
+              borderColor: 'rgba(59, 130, 246, 0.8)',
+              borderWidth: 1,
+              hoverBackgroundColor: 'rgba(59, 130, 246, 0.7)',
               hoverBorderColor: 'rgba(59, 130, 246, 1)',
-              hoverBorderWidth: 3
+              hoverBorderWidth: 2
             },
             {
               label: 'Аэропорт Пулково',
               data: pulkovoPoints,
-              backgroundColor: 'rgba(6, 182, 212, 0.8)',
-              borderColor: 'rgba(6, 182, 212, 1)',
-              borderWidth: 3,
-              hoverBackgroundColor: 'rgba(6, 182, 212, 1)',
+              backgroundColor: 'rgba(6, 182, 212, 0.5)',
+              borderColor: 'rgba(6, 182, 212, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(6, 182, 212, 0.8)',
               hoverBorderColor: 'rgba(6, 182, 212, 1)',
-              hoverBorderWidth: 4
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'Авиакомпания Россия',
+              data: rossiyaPoints,
+              backgroundColor: 'rgba(239, 68, 68, 0.4)',
+              borderColor: 'rgba(239, 68, 68, 0.8)',
+              borderWidth: 1,
+              hoverBackgroundColor: 'rgba(239, 68, 68, 0.7)',
+              hoverBorderColor: 'rgba(239, 68, 68, 1)',
+              hoverBorderWidth: 2
             }
           ]
         },
@@ -1122,8 +1177,7 @@ async def dashboard():
                   return [
                     `Вакансия: ${v.title}`,
                     `Зарплата: ${Math.round(v.x).toLocaleString()} ₽`,
-                    `Рейтинг: ${v.y.toFixed(1)} / 5.0`,
-                    `Откликов: ${v.r || 0}`
+                    `Рейтинг: ${v.y.toFixed(1)} / 5.0`
                   ];
                 }
               }
@@ -1212,21 +1266,73 @@ async def dashboard():
         console.log('Auto collected:', autoCollected, 'Total resumes:', totalResumes, 'Active resumes:', activeResumes);
         meta.innerText = '';
         console.log('Updated meta text:', meta.innerText);
+        // Get hourly rate data from the analyze endpoint
+        const hourlyRates = data.hourly_rates || {};
+        const avgHourlyRate = hourlyRates.avg ? Math.round(hourlyRates.avg) + ' ₽/ч' : 'N/A';
+        const minHourlyRate = hourlyRates.min ? Math.round(hourlyRates.min) : 'N/A';
+        const maxHourlyRate = hourlyRates.max ? Math.round(hourlyRates.max) : 'N/A';
+        const minMaxHourlyRate = (minHourlyRate !== 'N/A' && maxHourlyRate !== 'N/A') ? 
+          `${minHourlyRate} - ${maxHourlyRate} ₽/ч` : 'N/A';
+        
         const items = [
-          { label: 'Активные резюме', value: rs.active_resumes, icon: '👥' },
-          { label: 'Доля активных', value: (typeof rs.active_share === 'number' ? Math.round(rs.active_share * 100) + '%' : 'N/A'), icon: '📈' },
-          { label: 'Вакансий по запросу', value: rs.vacancy_count, icon: '💼' },
-          { label: 'Резюме на вакансию', value: (typeof rs.resumes_per_vacancy === 'number' ? rs.resumes_per_vacancy.toFixed(2) : 'N/A'), icon: '⚖️' },
+          { label: 'Активные резюме', value: rs.active_resumes, icon: '👥', hint: 'Количество резюме, обновленных за последние 30 дней' },
+          { label: 'Доля активных', value: (typeof rs.active_share === 'number' ? Math.round(rs.active_share * 100) + '%' : 'N/A'), icon: '📈', hint: 'Процент активных резюме от общего количества' },
+          { label: 'Средняя ЧТС', value: avgHourlyRate, icon: '⏰', hint: 'Средняя часовая тарифная ставка по вакансиям' },
+          { label: 'Мин/Макс ЧТС', value: minMaxHourlyRate, icon: '📊', hint: 'Диапазон часовых ставок от минимальной до максимальной' },
         ];
         grid.innerHTML = '';
         items.forEach(it => {
           const card = document.createElement('div');
           card.className = 'stat-card';
+          card.style.position = 'relative';
           card.innerHTML = `
             <div style="font-size: 24px; margin-bottom: 8px;">${it.icon}</div>
             <div style="font-size:12px; color:#cbd5e1; margin-bottom:4px;">${it.label}</div>
             <div style="font-size:18px; font-weight:bold; color:#60a5fa; text-shadow:0 0 4px rgba(96,165,250,0.5);">${it.value ?? '–'}</div>
+            <div class="tooltip" style="
+              visibility: hidden;
+              opacity: 0;
+              position: absolute;
+              bottom: 100%;
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: #1e293b;
+              color: white;
+              text-align: center;
+              border-radius: 6px;
+              padding: 8px 12px;
+              font-size: 12px;
+              white-space: nowrap;
+              z-index: 1000;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+              transition: opacity 0.3s, visibility 0.3s;
+              margin-bottom: 5px;
+            ">
+              ${it.hint}
+              <div style="
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 5px solid transparent;
+                border-top-color: #1e293b;
+              "></div>
+            </div>
           `;
+          
+          // Add hover events for tooltip
+          card.addEventListener('mouseenter', function() {
+            const tooltip = this.querySelector('.tooltip');
+            tooltip.style.visibility = 'visible';
+            tooltip.style.opacity = '1';
+          });
+          
+          card.addEventListener('mouseleave', function() {
+            const tooltip = this.querySelector('.tooltip');
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.opacity = '0';
+          });
+          
           grid.appendChild(card);
         });
       } catch (e) {
@@ -1249,7 +1355,12 @@ async def dashboard():
         ['врач-терапевт', 'врач терапевт'],
         ['врач терапевт', 'врач терапевт'],
         ['грузчик', 'грузчик склад'],
-        ['грузчик склад', 'грузчик склад']
+        ['грузчик склад', 'грузчик склад'],
+        ['водитель', 'водитель категория D'],
+        ['водитель категория D', 'водитель категория D'],
+        ['водитель спецтехники', 'водитель категория С'],
+        ['водитель категория С', 'водитель категория С'],
+        ['уборщик', 'уборщик клининг']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {

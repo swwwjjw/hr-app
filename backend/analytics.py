@@ -39,6 +39,56 @@ def salary_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     }
 
 
+def hourly_rate_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
+    """
+    Calculate hourly rate statistics (ЧТС - Часовая Тарифная Ставка).
+    Formula: ЗП ÷ 164 (average working hours per month)
+    Only includes positions with both salary and schedule information.
+    """
+    # Average working hours per month (164 hours)
+    HOURS_PER_MONTH = 164.0
+    
+    hourly_rates: List[float] = []
+    for v in vacancies:
+        # Skip per-shift flagged vacancies
+        if v.get("salary_per_shift"):
+            continue
+            
+        # Get salary
+        salary = v.get("salary_avg")
+        if salary is None:
+            salary = normalize_salary(v.get("salary"))
+        
+        # Check if we have valid salary
+        if salary is None or not isinstance(salary, (int, float)) or salary < 10000:
+            continue
+            
+        # Check if schedule is specified (we assume if schedule exists, it's a regular position)
+        schedule = v.get("schedule")
+        if not schedule:
+            continue
+            
+        # Calculate hourly rate
+        hourly_rate = float(salary) / HOURS_PER_MONTH
+        hourly_rates.append(hourly_rate)
+    
+    if not hourly_rates:
+        return {"count": 0, "avg": None, "median": None, "min": None, "max": None}
+    
+    hourly_rates.sort()
+    n = len(hourly_rates)
+    avg = sum(hourly_rates) / n
+    median = hourly_rates[n // 2] if n % 2 == 1 else (hourly_rates[n // 2 - 1] + hourly_rates[n // 2]) / 2
+    
+    return {
+        "count": n,
+        "avg": round(avg, 2),
+        "median": round(median, 2),
+        "min": round(hourly_rates[0], 2),
+        "max": round(hourly_rates[-1], 2),
+    }
+
+
 def top_skills(vacancies: List[Dict[str, Any]], top_n: int = 20) -> List[Tuple[str, int]]:
     # skills from key_skills or parse from description if available
     counter: Counter[str] = Counter()
