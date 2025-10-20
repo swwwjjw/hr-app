@@ -889,7 +889,10 @@ async def dashboard():
       console.log('Bubble chart data:', { itemsCount: items.length, sampleItem: items[0] });
       // Build salaries array (exclude per-shift)
       const salaries = items.map(v => {
-        if (v.salary_per_shift === true) return null;
+        // Use monthly salary including per-shift vacancies if estimated monthly is provided
+        if (v.salary_per_shift === true) {
+          return (typeof v.salary_estimated_monthly === 'number') ? v.salary_estimated_monthly : null;
+        }
         if (typeof v.salary_avg === 'number') return v.salary_avg;
         if (v.salary && typeof v.salary === 'object') {
           const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
@@ -919,8 +922,11 @@ async def dashboard():
       const sAvg = salaries.length ? (salaries.reduce((a,b)=>a+b,0) / salaries.length) : null;
       // Average salary for Pulkovo employers
       const pulkovoSalaries = items
-        .filter(v => (isPulkovoEmployerName(v.employer_name)) && v.salary_per_shift !== true)
+        .filter(v => isPulkovoEmployerName(v.employer_name))
         .map(v => {
+          if (v.salary_per_shift === true) {
+            return (typeof v.salary_estimated_monthly === 'number') ? v.salary_estimated_monthly : null;
+          }
           if (typeof v.salary_avg === 'number') return v.salary_avg;
           if (v.salary && typeof v.salary === 'object') {
             const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
@@ -966,38 +972,45 @@ async def dashboard():
 
       const points = items
         .map(v => {
-          let x = typeof v.salary_avg === 'number' ? v.salary_avg : null;
-          // Exclude per-shift salaries entirely from bubble chart
+          // Compute monthly salary value, converting per-shift to monthly when available
+          let monthly = null;
           if (v.salary_per_shift === true) {
-            x = null;
+            if (typeof v.salary_estimated_monthly === 'number') {
+              monthly = v.salary_estimated_monthly;
+            }
+          } else if (typeof v.salary_avg === 'number') {
+            monthly = v.salary_avg;
           }
-          if (x === null && v.salary && typeof v.salary === 'object') {
+          if (monthly === null && v.salary && typeof v.salary === 'object') {
             const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
             const st = (typeof v.salary.to === 'number') ? v.salary.to : null;
-            if (sf !== null && st !== null) x = (sf + st) / 2;
-            else if (sf !== null) x = sf;
-            else if (st !== null) x = st;
+            if (sf !== null && st !== null) monthly = (sf + st) / 2;
+            else if (sf !== null) monthly = sf;
+            else if (st !== null) monthly = st;
           }
           // Prefer employer_mark; if missing, fallback to employer_trusted as 1/0
-          let y = null;
+          let rating = null;
           if (typeof v.employer_mark === 'number') {
-            y = v.employer_mark;
+            rating = v.employer_mark;
           } else if (typeof v.employer_trusted === 'boolean') {
-            y = v.employer_trusted ? 1 : 0;
+            rating = v.employer_trusted ? 1 : 0;
           }
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
-          
+
+          if (monthly === null || rating === null || monthly < 10000) {
+            return null;
+          }
           return {
-            x,
-            y,
+            x: monthly,
+            y: rating,
             r: isPulkovo ? 12 : (isRossiya ? 12 : 6), // Larger bubble for Pulkovo and Rossiya
             title: v.title || '',
             employer: v.employer_name || '',
             isPulkovo: isPulkovo
           };
         })
-        .filter(p => p.x !== null && p.y !== null);
+        .filter(p => p !== null);
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
       // Create horizontal bar chart for candidate requirements
       const barChartContainer = document.getElementById('barChartContainer');
