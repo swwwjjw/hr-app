@@ -555,7 +555,7 @@ async def dashboard():
 <body>
   <div class="flight-pattern"></div>
   <div class="container">
-    <h1>Аналитика вакансий</h1>
+    <h1>Барометр вакансий ВВСС</h1>
     <div class="airport-badge">📍 Аэропорт Пулково</div>
     <div id="vacancyStats" class="meta" style="margin-bottom: 16px; font-size: 14px;"></div>
   <div class="controls">
@@ -567,7 +567,7 @@ async def dashboard():
       <option value="инспектор перрон">Инспекторы перронного контроля</option>
       <option value="гбр, охрана">Инспектор ГБР</option>
       <option value="врач терапевт">Врач-терапевт</option>
-              <option value="грузчик склад">Грузчик</option>
+              <!-- <option value="грузчик склад">Грузчик</option> -->
               <option value="водитель категория D">Водитель</option>
               <option value="водитель категория С">Водитель спецтехники</option>
               <option value="уборщик клининг">Уборщик</option>
@@ -575,7 +575,7 @@ async def dashboard():
     <button id="apply">Найти</button>
   </div>
   <div class="card" id="marketCard" style="margin-top:24px; padding:20px;">
-    <h3>Сравнение с рынком</h3>
+    <h3>Сравнение с рынком по заработной плате</h3>
     <div style="display:flex; justify-content:space-between; font-size:12px; color:#cbd5e1; margin-bottom:12px;">
       <div style="color:#94a3b8;">Ниже рынка</div>
       <div style="color:#3b82f6;">В рынке</div>
@@ -602,7 +602,7 @@ async def dashboard():
       <canvas id="bubbleChart" height="140"></canvas>
     </div>
     <div class="card">
-      <h3>Статистика зарплат</h3>
+      <h3>Меры тенденций</h3>
       <div id="salaryIcons" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 0;"></div>
     </div>
   </div>
