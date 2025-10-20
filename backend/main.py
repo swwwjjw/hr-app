@@ -621,7 +621,7 @@ async def dashboard():
         <p style="margin:0;"><strong>Активность:</strong> Высокий процент активных резюме указывает на востребованность позиции на рынке труда.</p>
       </div>
     </div>
-    <div class="card">
+    <div class="card" style="margin-top:24px;">
       <h3>Распределение зарплат</h3>
       <canvas id="salaryHistogram" height="200"></canvas>
     </div>
