@@ -126,11 +126,15 @@ def _parse_number(text: str) -> Optional[float]:
 
 
 def estimate_monthly_salary_from_text(title: str, responsibility: str, requirement: Optional[str], description_text: str) -> Optional[float]:
-    """Best-effort extraction of per-shift pay and conversion to monthly estimate.
-    Heuristics:
-      - Detect phrases like 'за смену', 'смена', 'смены' near an amount
-      - Extract one or two numbers (range). If two, average them
-      - Multiply per-shift rate by a default 15 shifts/month
+    """Extract per-shift pay and convert to an estimated monthly salary.
+
+    Improvements over the old heuristic:
+      - Recognizes more per-shift patterns ("₽/смена", "руб/смену", "за смену", "смена — 4500")
+      - Supports numeric ranges for per-shift pay (e.g., "4500–5500 руб/смена")
+      - Detects declared number of shifts per month/week (e.g., "18 смен в месяц", "3 смены в неделю")
+      - Infers monthly number of shifts from schedules like "2/2", "5/2", "1/3", and phrases like
+        "сутки через двое/трое/сутки" using a 30-day month approximation
+      - Falls back to 15 shifts/month when schedule cannot be inferred
     """
     try:
         import re
@@ -141,37 +145,124 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             (description_text or ""),
         ]).lower()
 
-        # Quick guard: look for shift keywords
-        if not re.search(r"\b(смена|смены|за\s+смену|посменн)\b", blob):
+        # Guard: only proceed if vacancy mentions shift-based payment
+        if not re.search(r"\b(смена|смены|за\s+смену|/\s*смен[ау]|посменн)\b", blob):
             return None
 
-        # Patterns like: 'за смену 3 500', 'оплата за смену: 4000₽', 'смена 4500 руб'
-        money_patterns = [
-            r"за\s+смену\s*[:\-]?\s*([0-9][0-9\s\.,]{2,})",
-            r"смена\s*[:\-]?\s*([0-9][0-9\s\.,]{2,})",
-            r"оплата\s+за\s+смену\s*[:\-]?\s*([0-9][0-9\s\.,]{2,})",
+        # --- 1) Extract per-shift pay candidates ---
+        candidates: List[float] = []
+        range_candidates: List[float] = []
+        simple_candidates: List[float] = []
+
+        # Helper to add a numeric group if present
+        def _add_group(m: re.Match, group_idx: int = 1) -> None:
+            val = _parse_number(m.group(group_idx))
+            if isinstance(val, (int, float)):
+                candidates.append(float(val))
+
+        # Patterns where number follows an explicit per-shift marker
+        patterns_simple = [
+            # за смену 3 500, оплата за смену: 4000, 4000 за смену
+            r"за\s+смену\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})",
+            r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*(?:/\s*смен[ау]|за\s+смен[уы])",
+            # смена 4500 руб, смена: 4500
+            r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
+            # 4500₽/смена, 4500 руб/смену, 4500 р/смена
+            r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*/\s*смен[ау]",
         ]
 
-        candidates: List[float] = []
-        for pat in money_patterns:
+        for pat in patterns_simple:
             for m in re.finditer(pat, blob):
                 val = _parse_number(m.group(1))
                 if isinstance(val, (int, float)):
-                    candidates.append(float(val))
+                    simple_candidates.append(float(val))
 
-        # Also try simple ranges near 'смен'
-        for m in re.finditer(r"([0-9][0-9\s\.,]{2,})\s*[–\-\/]\s*([0-9][0-9\s\.,]{2,}).{0,12}(смен)", blob):
-            v1 = _parse_number(m.group(1))
-            v2 = _parse_number(m.group(2))
-            if v1 and v2:
-                candidates.append((v1 + v2) / 2.0)
+        # Ranges near explicit per-shift markers: 3500-4500 за смену, 3 500 / 4 500 р/смена
+        range_patterns = [
+            r"([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*(?:/\s*смен[ау]|за\s+смен[уы])",
+            r"за\s+смену\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
+            r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
+        ]
 
+        for pat in range_patterns:
+            for m in re.finditer(pat, blob):
+                v1 = _parse_number(m.group(1))
+                v2 = _parse_number(m.group(2))
+                if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
+                    range_candidates.append((float(v1) + float(v2)) / 2.0)
+
+        # Prefer averages derived from explicit ranges when present
+        candidates = range_candidates if range_candidates else simple_candidates
         if not candidates:
             return None
 
+        # Compute per-shift amount as robust average of detected values
         per_shift = sum(candidates) / len(candidates)
-        # Conservative default: 15 shifts/month
-        monthly_estimate = per_shift * 15.0
+
+        # --- 2) Determine number of shifts per month ---
+        # Priority A: explicit statements like "18 смен в месяц" or "3 смены в неделю"
+        monthly_shifts: Optional[float] = None
+
+        # e.g., "18 смен в месяц", "15-20 смен в месяц", "18 смен/мес"
+        m_month = re.search(
+            r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*мес(?:яц)?|/\s*мес)\b",
+            blob,
+        )
+        if m_month:
+            low = _parse_number(m_month.group(1))
+            hi = _parse_number(m_month.group(2)) if m_month.lastindex and m_month.group(2) else None
+            if isinstance(low, (int, float)):
+                if isinstance(hi, (int, float)):
+                    monthly_shifts = (float(low) + float(hi)) / 2.0
+                else:
+                    monthly_shifts = float(low)
+
+        # e.g., "3-4 смены в неделю", "3 смены/нед"
+        if monthly_shifts is None:
+            m_week = re.search(
+                r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*недел[юи]|/\s*нед)\b",
+                blob,
+            )
+            if m_week:
+                low = _parse_number(m_week.group(1))
+                hi = _parse_number(m_week.group(2)) if m_week.lastindex and m_week.group(2) else None
+                if isinstance(low, (int, float)):
+                    per_week = float(low) if not isinstance(hi, (int, float)) else (float(low) + float(hi)) / 2.0
+                    # average weeks per month ≈ 4.33
+                    monthly_shifts = per_week * 4.33
+
+        # Priority B: infer from common schedules like 2/2, 5/2, 1/3, etc.
+        # We use 30-day month approximation: monthly_shifts ≈ 30 * on_days / (on_days + off_days)
+        if monthly_shifts is None:
+            # Avoid matching fractions in unrelated contexts (require small integers)
+            m_sched = re.search(r"\b(\d{1,2})\s*/\s*(\d{1,2})\b", blob)
+            if m_sched:
+                try:
+                    on_days = int(m_sched.group(1))
+                    off_days = int(m_sched.group(2))
+                    if 0 < on_days <= 31 and 0 < off_days <= 31:
+                        monthly_shifts = 30.0 * (on_days / float(on_days + off_days))
+                except Exception:
+                    pass
+
+        # Priority C: phrases like "сутки через двое|трое|сутки"
+        if monthly_shifts is None:
+            if re.search(r"сутки\s+через\s+двое", blob):
+                monthly_shifts = 30.0 / 3.0  # 1 on, 2 off
+            elif re.search(r"сутки\s+через\s+трое", blob):
+                monthly_shifts = 30.0 / 4.0  # 1 on, 3 off
+            elif re.search(r"сутки\s+через\s+сутки", blob):
+                monthly_shifts = 30.0 / 2.0  # 1 on, 1 off
+
+        # Final fallback: conservative 15 shifts/month (e.g., 2/2 over 30 days)
+        if monthly_shifts is None:
+            monthly_shifts = 15.0
+
+        # Sanity bounds to avoid absurd values from mis-parsing
+        # Typical shift counts range from ~6 to ~26 per month
+        monthly_shifts = max(6.0, min(26.0, float(monthly_shifts)))
+
+        monthly_estimate = per_shift * monthly_shifts
         return float(monthly_estimate)
     except Exception:
         return None
