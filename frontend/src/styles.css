@@ -9,6 +9,7 @@ body {
 .container { max-width: 1200px; margin: 0 auto; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .row-wide { grid-template-columns: 2fr 1fr; }
+.card-full { grid-column: 1 / -1; }
 .card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
 .miniCard { border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: #f9fafb; }
 .meta { color: #000; font-weight: 500; margin-bottom: 12px; }
