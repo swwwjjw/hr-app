@@ -9,17 +9,17 @@ except Exception:
 
 
 def salary_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
-    # Prefer already computed monthly averages if available, then fall back to API salary,
-    # then to estimated monthly derived from per-shift mentions.
+    # Prefer already computed monthly averages if available, then fall back to API salary.
+    # If vacancy is per-shift and has an estimated monthly, include that to avoid losing data.
     raw: List[Optional[float]] = []
     for v in vacancies:
-        # Skip per-shift flagged vacancies
         if v.get("salary_per_shift"):
+            est = v.get("salary_estimated_monthly")
+            raw.append(est if isinstance(est, (int, float)) else None)
             continue
         val = v.get("salary_avg")
         if val is None:
             val = normalize_salary(v.get("salary"))
-        # Do not use estimated per-shift monthly values in stats
         raw.append(val if isinstance(val, (int, float)) else None)
     # Filter out invalid/likely per-shift small values (< 10 000₽)
     MIN_VALID_MONTHLY = 10000.0
