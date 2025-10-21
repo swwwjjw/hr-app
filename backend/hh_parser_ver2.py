@@ -129,7 +129,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
     """Extract per-shift pay and convert to an estimated monthly salary.
 
     Improvements over the old heuristic:
-      - Recognizes more per-shift patterns ("₽/смена", "руб/смену", "за смену", "смена — 4500")
+      - Recognizes more per-shift patterns ("₽/смена", "руб/смену", "за смену", "смена — 4500",
+        "сменный график: 4500", "график сменный — 4500")
       - Supports numeric ranges for per-shift pay (e.g., "4500–5500 руб/смена")
       - Detects declared number of shifts per month/week (e.g., "18 смен в месяц", "3 смены в неделю")
       - Infers monthly number of shifts from schedules like "2/2", "5/2", "1/3", and phrases like
@@ -171,6 +172,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*/\s*смен[ау]",
             # посменная оплата: 4500, посменно 4500
             r"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
+            # сменный график: 4500, график сменный — 4500 (require boundary after number, avoid monthly markers nearby)
+            r"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})(?=(?:\s*(?:₽|р\.?|руб\.?|rub|rur))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
         ]
 
         for pat in patterns_simple:
@@ -186,6 +189,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
             # посменная оплата: 4000–5000
             r"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
+            # сменный график: 4000–5000, график сменный — 4000/5000 (require boundary and avoid monthly markers nearby)
+            r"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})(?=(?:\s*(?:₽|р\.?|руб\.?|rub|rur))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
         ]
 
         for pat in range_patterns:
