@@ -58,6 +58,52 @@ async def root_redirect():
 cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 0
 
+def _is_kpp_selection(query: str) -> bool:
+    """Return True if the query refers to the 'Контролер КПП' selection."""
+    try:
+        q = (query or "").strip().casefold()
+        # Match phrases like 'контролер кпп' even if extra words are present
+        return ("контролер" in q or "контролёр" in q) and "кпп" in q
+    except Exception:
+        return False
+
+def _employer_matches_rossgvardiya_szf(name: str) -> bool:
+    """Robust match for the specified employer name.
+    Target: 'Управление по Северо-Западному федеральному округу Центра охраны объектов промышленности (филиал) ФГУП Охрана Росгвардии'
+    """
+    if not name:
+        return False
+    n = str(name).casefold()
+    return ("фгуп охрана росгвардии" in n) and ("северо-западному федеральному округу" in n)
+
+def _salary_is_exact_10000(salary_obj: Any) -> bool:
+    """Return True if normalized salary equals 10000 or bounds equal 10000."""
+    try:
+        from_val = None
+        to_val = None
+        if isinstance(salary_obj, dict):
+            from_val = salary_obj.get("from")
+            to_val = salary_obj.get("to")
+        norm = normalize_salary(salary_obj)
+        if isinstance(norm, (int, float)) and float(norm) == 10000.0:
+            return True
+        if isinstance(from_val, (int, float)) and float(from_val) == 10000.0:
+            return True
+        if isinstance(to_val, (int, float)) and float(to_val) == 10000.0:
+            return True
+    except Exception:
+        return False
+    return False
+
+def _should_exclude_for_selection(query: str, item: Dict[str, Any]) -> bool:
+    """Exclude a specific employer's vacancy with salary 10000 for 'Контролер КПП' selection."""
+    if not _is_kpp_selection(query):
+        return False
+    employer = (item or {}).get("employer") or {}
+    if not _employer_matches_rossgvardiya_szf(employer.get("name")):
+        return False
+    return _salary_is_exact_10000((item or {}).get("salary"))
+
 def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
     """Generate a cache key from query parameters."""
     params = {
@@ -205,7 +251,9 @@ async def fetch(
         schedule_obj = item.get("schedule") or {}
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
-            filtered_items.append(item)
+            # Exclude targeted vacancy from the 'Контролер КПП' selection
+            if not _should_exclude_for_selection(query, item):
+                filtered_items.append(item)
     
     if simplified:
         parsed = await parse_vacancies(filtered_items, with_employer_mark=employer_mark)
@@ -244,7 +292,9 @@ async def analyze(
         schedule_obj = item.get("schedule") or {}
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
-            filtered_items.append(item)
+            # Exclude targeted vacancy from the 'Контролер КПП' selection
+            if not _should_exclude_for_selection(query, item):
+                filtered_items.append(item)
     
     # Use parsed vacancies so per-shift monthly estimates are considered
     parsed_for_stats = await parse_vacancies(filtered_items, with_employer_mark=False)
