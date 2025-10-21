@@ -76,7 +76,7 @@ CACHE_TTL = 0
 #     n = str(name).casefold()
 #     return ("фгуп охрана росгвардии" in n) and ("северо-западному федеральному округу" in n)
 
-def _salary_is_exact_10000(salary_obj: Any) -> bool:
+def _salary_is_less_then_15000(salary_obj: Any) -> bool:
     """Return True if normalized salary equals 10000 or bounds equal 10000."""
     try:
         from_val = None
@@ -85,11 +85,11 @@ def _salary_is_exact_10000(salary_obj: Any) -> bool:
             from_val = salary_obj.get("from")
             to_val = salary_obj.get("to")
         norm = normalize_salary(salary_obj)
-        if isinstance(norm, (int, float)) and float(norm) == 10000.0:
+        if isinstance(norm, (int, float)) and float(norm) < 15000.0:
             return True
-        if isinstance(from_val, (int, float)) and float(from_val) == 10000.0:
+        if isinstance(from_val, (int, float)) and float(from_val) < 15000.0:
             return True
-        if isinstance(to_val, (int, float)) and float(to_val) == 10000.0:
+        if isinstance(to_val, (int, float)) and float(to_val) < 15000.0:
             return True
     except Exception:
         return False
@@ -102,7 +102,7 @@ def _should_exclude_for_selection(query: str, item: Dict[str, Any]) -> bool:
     employer = (item or {}).get("employer") or {}
     # if not _employer_matches_rossgvardiya_szf(employer.get("name")):
     #     return False
-    return _salary_is_exact_10000((item or {}).get("salary"))
+    return _salary_is_less_then_15000((item or {}).get("salary"))
 
 def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
     """Generate a cache key from query parameters."""
