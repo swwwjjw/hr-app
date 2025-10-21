@@ -52,8 +52,9 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
           return null;
         }
         return {
-          x: employerMark,
-          y: monthly / 1000,
+          // Put salary on X axis (in thousands), rating on Y axis
+          x: monthly / 1000,
+          y: employerMark,
           r: 6,
           title: i.title,
           employer: i.employer_name,
@@ -81,15 +82,17 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
       tooltip: {
         callbacks: {
           label: (ctx: any) => {
-            const d = ctx.raw;
-            return `${d?.title || ''} – ${d?.employer || ''}: ${Math.round((d?.y || 0))} тыс.`;
+            const d = ctx.raw as any;
+            const salaryThs = Math.round(d?.x || 0);
+            const rating = (d?.y ?? 0).toFixed ? (d.y as number).toFixed(1) : d?.y;
+            return `${d?.title || ''} – ${d?.employer || ''}: ${salaryThs} тыс., рейтинг ${rating}`;
           },
         },
       },
     },
     scales: {
-      x: { title: { display: true, text: 'Рейтинг работодателя' }, min: 0, max: 5 },
-      y: { title: { display: true, text: 'Зарплата, тыс. ₽' } },
+      x: { title: { display: true, text: 'Зарплата, тыс. ₽' } },
+      y: { title: { display: true, text: 'Рейтинг работодателя' }, min: 0, max: 5 },
     },
   }), []);
 
