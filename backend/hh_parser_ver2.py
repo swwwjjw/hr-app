@@ -211,24 +211,38 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
 
         # Patterns where number follows an explicit per-shift marker
         # Accept common short forms for "shift" like "см." in addition to "смена/смену/смены"
-        SHIFT_TOKEN = r"(?:смен[ауыее]?|см\.?)(?=\b)"
+        # Also accept colloquial Russian synonyms like "выход" and 24h shift term "сутки"
+        SHIFT_TOKEN = r"(?:смен[ауыее]?|см\.?|выход\w*|сутк\w*)(?=\b)"
+        # English variants occasionally appear in mixed-language posts
+        SHIFT_TOKEN_EN = r"(?:per\s*shift|/\s*shift|a\s*shift)(?=\b)"
 
         # Common representations of ruble units, including word forms like "рублей/рубля/рубли/рубль"
-        RUBLE_UNITS = r"(?:₽|р\.?|руб\.?|rub|rur|рубл(?:ей|я|и|ь)?)"
+        RUBLE_UNITS = r"(?:₽|р\.?|руб\.?|rub|rur|rubles?|ruble|рубл(?:ей|я|и|ь)?)"
 
         patterns_simple = [
             # за смену 3 500, оплата за смену: 4000, 4000 за смену, за см. 4000
-            rf"за\s+(?:{SHIFT_TOKEN})\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            rf"за\s+(?:{SHIFT_TOKEN})\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
             # 4500 рублей за смену, 4500 р за смену, 4500 ₽/смена
-            rf"([0-9][0-9\s\.,]{2,})\s*(?:{RUBLE_UNITS})?\s*(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
             # смена 4500 руб, смена: 4500, см. 4500
-            rf"{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            rf"{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
             # 4500₽/смена, 4500 руб/смену, 4500 р/смена, 4.5 тыс/см.
-            rf"([0-9][0-9\s\.,]{2,})\s*(?:{RUBLE_UNITS})?\s*/\s*{SHIFT_TOKEN}(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*/\s*{SHIFT_TOKEN}(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            # 4,5 тыс/см. — thousand marker before the /shift token
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к)\s*/\s*{SHIFT_TOKEN}",
             # посменная оплата: 4500, посменно 4500
-            rf"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            rf"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
             # сменный график: 4500, график сменный — 4500 (require boundary after number, avoid monthly markers nearby)
-            rf"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})(?=(?:\s*(?:{RUBLE_UNITS}))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
+            rf"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})(?=(?:\s*(?:{RUBLE_UNITS}))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
+            # 4500 в смену / в сутки / за выход (common colloquialisms)
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:в\s+{SHIFT_TOKEN})",
+            # Bare unitless: 4500 руб смена / 4500 руб сутки
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})\s*{SHIFT_TOKEN}",
+            # English: 4000 RUB per shift, 4000 per shift, 4000₽/shift
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:{SHIFT_TOKEN_EN})",
+            # оплата смены: 4500, ставка за смену 4500
+            rf"(?:оплата|ставка)\s+{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?",
+            rf"(?:оплата|ставка)\s*(?:за\s+)?{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?",
         ]
 
         for pat in patterns_simple:
@@ -251,6 +265,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             rf"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})(?=(?:\s*(?:{RUBLE_UNITS}))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
             # Ranges with explicit 'от ... до ...' near shift marker, any order
             rf"(?:за\s+{SHIFT_TOKEN}\s*)?от\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS}|тыс\.?|т\.?\s*р\.?|тр|k|к)?\s*до\s*([0-9][0-9\s\.,]{{2,}}).{{0,20}}(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
+            # English range: 4000-5000 per shift
+            rf"([0-9][0-9\s\.,]{{2,}})\s*[\-–—/]\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:{SHIFT_TOKEN_EN})",
         ]
 
         for pat in range_patterns:
@@ -283,6 +299,17 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
                 r"(?:в\s*мес(?:яц)?|/\s*мес)\s*(\d{1,2})\s*смен[аы]?\b",
                 blob,
             )
+        # Support synonyms: "выходов" and "суток" per month
+        if not m_month:
+            m_month = re.search(
+                r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*(?:выход\w*|сутк\w*)\s*(?:в\s*мес(?:яц)?|/\s*мес)\b",
+                blob,
+            )
+        if not m_month:
+            m_month = re.search(
+                r"(?:в\s*мес(?:яц)?|/\s*мес)\s*(\d{1,2})\s*(?:выход\w*|сутк\w*)\b",
+                blob,
+            )
         if m_month:
             low = _parse_number(m_month.group(1))
             hi = _parse_number(m_month.group(2)) if m_month.lastindex and m_month.group(2) else None
@@ -301,6 +328,17 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             if not m_week:
                 m_week = re.search(
                     r"(?:в\s*недел[юи]|/\s*нед)\s*(\d{1,2})\s*смен[аы]?\b",
+                    blob,
+                )
+            # Synonyms: выходов/суток в неделю
+            if not m_week:
+                m_week = re.search(
+                    r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*(?:выход\w*|сутк\w*)\s*(?:в\s*недел[юи]|/\s*нед)\b",
+                    blob,
+                )
+            if not m_week:
+                m_week = re.search(
+                    r"(?:в\s*недел[юи]|/\s*нед)\s*(\d{1,2})\s*(?:выход\w*|сутк\w*)\b",
                     blob,
                 )
             if m_week:
