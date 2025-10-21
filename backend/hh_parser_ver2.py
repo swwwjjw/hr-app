@@ -51,7 +51,7 @@ async def fetch_resume_ids_by_query(query: str, area: Optional[int] = None, page
     resume_ids = []
     for i in range(count):
         # Generate a realistic-looking resume ID
-        mock_id = f"{random.randint(10000000, 99999999)}"
+        mock_id = f"{random.randint(00000000, 99999999)}"
         resume_ids.append(mock_id)
     
     return resume_ids
