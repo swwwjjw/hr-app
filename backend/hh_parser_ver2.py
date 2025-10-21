@@ -214,7 +214,7 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
 
         # e.g., "18 смен в месяц", "15-20 смен в месяц", "18 смен/мес"
         m_month = re.search(
-            r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*мес(?:яц)?|/\s*мес)\b",
+            r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*мес(?:яц)?\.?|/\s*мес\.?|/\s*month|per\s*month)\b",
             blob,
         )
         if m_month:
@@ -229,7 +229,7 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
         # e.g., "3-4 смены в неделю", "3 смены/нед"
         if monthly_shifts is None:
             m_week = re.search(
-                r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*недел[юи]|/\s*нед)\b",
+                r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*недел[юи]\.?.?|в\s*нед\.?|/\s*нед\.?|/\s*week|per\s*week)\b",
                 blob,
             )
             if m_week:
@@ -243,13 +243,17 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
         # Priority B: infer from common schedules like 2/2, 5/2, 1/3, etc.
         # We use 30-day month approximation: monthly_shifts ≈ 30 * on_days / (on_days + off_days)
         if monthly_shifts is None:
-            # Avoid matching fractions in unrelated contexts (require small integers)
+            # Avoid matching fractions in unrelated contexts (require plausible day-based schedules)
             m_sched = re.search(r"\b(\d{1,2})\s*/\s*(\d{1,2})\b", blob)
             if m_sched:
                 try:
                     on_days = int(m_sched.group(1))
                     off_days = int(m_sched.group(2))
-                    if 0 < on_days <= 31 and 0 < off_days <= 31:
+                    # Ignore common hour-based idioms like 24/7
+                    if on_days == 24 and off_days == 7:
+                        pass
+                    # Accept only plausible day-based schedules within a week window (e.g., 5/2, 2/2, 1/3)
+                    elif 0 < on_days <= 7 and 0 < off_days <= 7:
                         monthly_shifts = 30.0 * (on_days / float(on_days + off_days))
                 except Exception:
                     pass
@@ -268,8 +272,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             monthly_shifts = 15.0
 
         # Sanity bounds to avoid absurd values from mis-parsing
-        # Typical shift counts range from ~6 to ~26 per month
-        monthly_shifts = max(6.0, min(26.0, float(monthly_shifts)))
+        # Typical shift counts range from ~6 to ~30 per month
+        monthly_shifts = max(6.0, min(30.0, float(monthly_shifts)))
 
         monthly_estimate = per_shift * monthly_shifts
         return float(monthly_estimate)
