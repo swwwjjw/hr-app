@@ -586,12 +586,12 @@ async def dashboard():
       <option value="">Выберите вакансию</option>
       <option value="контролер кпп">Инспекторы-контролёры</option>
       <option value="инспектор досмотр">Инспекторы по досмотру</option>
-      <option value="инспектор перрон">Инспекторы перронного контроля</option>
-      <option value="гбр, охрана">Инспектор ГБР</option>
+      <!-- <option value="инспектор перрон">Инспекторы перронного контроля</option> -->
+      <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
       <option value="врач терапевт">Врач-терапевт</option>
               <!-- <option value="грузчик склад">Грузчик</option> -->
               <option value="водитель категория D">Водитель</option>
-              <option value="водитель категория С">Водитель спецтехники</option>
+              <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Уборщик</option>
     </select>
     <button id="apply">Найти</button>
