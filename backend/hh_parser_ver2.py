@@ -145,9 +145,9 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             (description_text or ""),
         ]).lower()
 
-        # Guard: only proceed if vacancy mentions shift-based payment
-        if not re.search(r"\b(смена|смены|за\s+смену|/\s*смен[ау]|посменн)\b", blob):
-            return None
+        # Note: do not hard-guard on keywords like "смена" here.
+        # We rely on explicit per-shift patterns below to avoid false negatives
+        # (e.g., phrases like "посменно" would be missed by a strict \b...\b check).
 
         # --- 1) Extract per-shift pay candidates ---
         candidates: List[float] = []
@@ -169,6 +169,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
             # 4500₽/смена, 4500 руб/смену, 4500 р/смена
             r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*/\s*смен[ау]",
+            # посменная оплата: 4500, посменно 4500
+            r"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
         ]
 
         for pat in patterns_simple:
@@ -182,6 +184,8 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             r"([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*(?:/\s*смен[ау]|за\s+смен[уы])",
             r"за\s+смену\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
             r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
+            # посменная оплата: 4000–5000
+            r"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
         ]
 
         for pat in range_patterns:
