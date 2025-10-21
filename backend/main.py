@@ -333,7 +333,7 @@ async def resume_stats(
                 query=vacancy_query, 
                 area=area, 
                 pages=1,  # Limit to 1 page for performance
-                per_page=20  # Limit to 20 resumes for performance
+                per_page=50  # Limit to 20 resumes for performance
             )
             resume_ids = auto_resume_ids
         except Exception as e:
