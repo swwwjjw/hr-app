@@ -889,7 +889,7 @@ async def dashboard():
       const items = Array.isArray(fdata.items) ? fdata.items : [];
       console.log('Bubble chart data:', { itemsCount: items.length, sampleItem: items[0] });
       // Build salaries array (exclude per-shift)
-      const salaries = items.map(v => {
+      const salariesAll = items.map(v => {
         // Use monthly salary including per-shift vacancies if estimated monthly is provided
         if (v.salary_per_shift === true) {
           return (typeof v.salary_estimated_monthly === 'number') ? v.salary_estimated_monthly : null;
@@ -915,6 +915,26 @@ async def dashboard():
         const w = idx - lo;
         return arr[lo] * (1 - w) + arr[hi] * w;
       };
+
+      // Apply high outlier filtering (Tukey IQR). Fallback for tiny samples.
+      let salaries = salariesAll;
+      if (salariesAll.length >= 4) {
+        const q1 = percentile(salariesAll, 0.25);
+        const q3 = percentile(salariesAll, 0.75);
+        const iqr = q3 - q1;
+        if (iqr > 0) {
+          const highCut = q3 + 1.5 * iqr;
+          const filtered = salariesAll.filter(s => s <= highCut);
+          if (filtered.length >= Math.min(3, salariesAll.length)) {
+            salaries = filtered;
+          }
+        }
+      } else if (salariesAll.length >= 2) {
+        const medSmall = percentile(salariesAll, 0.50);
+        if (salariesAll[salariesAll.length - 1] > 2 * medSmall) {
+          salaries = salariesAll.slice(0, -1);
+        }
+      }
 
       const p25 = percentile(salaries, 0.25);
       const p50 = percentile(salaries, 0.50);
