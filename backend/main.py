@@ -936,6 +936,21 @@ async def dashboard():
         }
       }
 
+      // Determine an upper salary threshold for bubble points to hide extreme single values
+      // Use the same Tukey IQR rule when possible; otherwise use a conservative 2x median cap
+      let salaryUpperCap = Number.POSITIVE_INFINITY;
+      if (salariesAll.length >= 4) {
+        const q1Cap = percentile(salariesAll, 0.25);
+        const q3Cap = percentile(salariesAll, 0.75);
+        const iqrCap = q3Cap - q1Cap;
+        if (iqrCap > 0) {
+          salaryUpperCap = q3Cap + 1.5 * iqrCap;
+        }
+      } else if (salariesAll.length >= 2) {
+        const medSmallCap = percentile(salariesAll, 0.50);
+        salaryUpperCap = 2 * medSmallCap;
+      }
+
       const p25 = percentile(salaries, 0.25);
       const p50 = percentile(salaries, 0.50);
       const p75 = percentile(salaries, 0.75);
@@ -1020,6 +1035,10 @@ async def dashboard():
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
 
           if (monthly === null || rating === null || monthly < 10000) {
+            return null;
+          }
+          // Hide extreme salary outliers from the bubble chart
+          if (monthly > salaryUpperCap) {
             return null;
           }
           return {
