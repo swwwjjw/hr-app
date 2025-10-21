@@ -67,6 +67,66 @@ def _is_kpp_selection(query: str) -> bool:
     except Exception:
         return False
 
+def _is_driver_selection(query: str) -> bool:
+    """Return True if the query refers to driver-related selections."""
+    try:
+        q = (query or "").strip().casefold()
+        return "водитель" in q
+    except Exception:
+        return False
+
+def _is_pulkovo_special_equipment_driver(title: str, employer_name: str) -> bool:
+    """Return True if this is the specific Pulkovo 'Водитель спецтехники в аэропорту' vacancy to exclude from driver searches."""
+    try:
+        title_lower = (title or "").strip().casefold()
+        employer_lower = (employer_name or "").strip().casefold()
+        
+        # Check if it's from Pulkovo airport
+        is_pulkovo = "пулково" in employer_lower or "аэропорт пулково" in employer_lower
+        
+        if not is_pulkovo:
+            return False
+        
+        # Exclude only "Водитель спецтехники в аэропорту"
+        if ("водитель" in title_lower and 
+            ("спецтехники" in title_lower or "спецтехника" in title_lower) and
+            "аэропорту" in title_lower):
+            return True
+        
+        return False
+    except Exception:
+        return False
+
+def _is_pulkovo_driver_special_equipment(title: str, employer_name: str) -> bool:
+    """Return True if this is a specific Pulkovo vacancy to exclude from driver searches."""
+    try:
+        title_lower = (title or "").strip().casefold()
+        employer_lower = (employer_name or "").strip().casefold()
+        
+        # Check if it's from Pulkovo airport
+        is_pulkovo = "пулково" in employer_lower or "аэропорт пулково" in employer_lower
+        
+        if not is_pulkovo:
+            return False
+        
+        # Exclude specific vacancies:
+        # 1. "Водитель спецтехники в аэропорту"
+        if "водитель" in title_lower and ("спецтехники" in title_lower or "спецтехника" in title_lower):
+            return True
+        
+        # 2. "Машинист компрессора передвижного с двигателем внутреннего сгорания"
+        if ("машинист" in title_lower and "компрессора" in title_lower and 
+            "передвижного" in title_lower and "двигателем" in title_lower):
+            return True
+        
+        # 3. "Водитель с категорией D"
+        if "водитель" in title_lower and "категорией d" in title_lower:
+            return True
+        
+        return False
+    except Exception:
+        return False
+
 def _employer_matches_rossgvardiya_szf(name: str) -> bool:
     """Robust match for the specified employer name.
     Target: 'Управление по Северо-Западному федеральному округу Центра охраны объектов промышленности (филиал) ФГУП Охрана Росгвардии'
@@ -96,13 +156,22 @@ def _salary_is_exact_10000(salary_obj: Any) -> bool:
     return False
 
 def _should_exclude_for_selection(query: str, item: Dict[str, Any]) -> bool:
-    """Exclude a specific employer's vacancy with salary 10000 for 'Контролер КПП' selection."""
-    if not _is_kpp_selection(query):
-        return False
-    employer = (item or {}).get("employer") or {}
-    if not _employer_matches_rossgvardiya_szf(employer.get("name")):
-        return False
-    return _salary_is_exact_10000((item or {}).get("salary"))
+    """Exclude specific vacancies based on query type."""
+    # Exclude specific employer's vacancy with salary 10000 for 'Контролер КПП' selection
+    if _is_kpp_selection(query):
+        employer = (item or {}).get("employer") or {}
+        if _employer_matches_rossgvardiya_szf(employer.get("name")):
+            return _salary_is_exact_10000((item or {}).get("salary"))
+    
+    # Exclude only specific Pulkovo "Водитель спецтехники в аэропорту" from driver selections
+    if _is_driver_selection(query):
+        title = (item or {}).get("name", "")
+        employer = (item or {}).get("employer", {})
+        employer_name = employer.get("name", "")
+        if _is_pulkovo_special_equipment_driver(title, employer_name):
+            return True
+    
+    return False
 
 def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
     """Generate a cache key from query parameters."""
@@ -635,13 +704,10 @@ async def dashboard():
       <option value="">Выберите вакансию</option>
       <option value="контролер кпп">Инспекторы-контролёры</option>
       <option value="инспектор досмотр">Инспекторы по досмотру</option>
-      <option value="склад самолет">Инспекторы перронного контроля</option>
-      <option value="гбр, охрана">Инспектор ГБР</option>
       <option value="врач терапевт">Врач-терапевт</option>
               <!-- <option value="грузчик склад">Грузчик</option> -->
               <option value="водитель категория D">Водитель</option>
-              <option value="водитель категория С">Водитель спецтехники</option>
-              <option value="уборщик клининг">Уборщик</option>
+              <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
     <button id="apply">Найти</button>
   </div>
@@ -765,15 +831,11 @@ async def dashboard():
       const queryToPreset = {
         'контролер кпп': 'контролер кпп',
         'инспектор досмотр': 'инспектор досмотр', 
-        'инспектор перрон': 'склад самолет',
-        'гбр охрана': 'гбр охрана',
-        'гбр охрана': 'гбр охрана',
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
         'грузчик склад': 'грузчик склад',
         'грузчик': 'грузчик склад',
         'водитель категория С': 'водитель категория С',
-        'водитель спецтехники': 'водитель категория С',
         'водитель категория D': 'водитель категория D',
         'водитель': 'водитель категория D',
         'уборщик клининг': 'уборщик клининг',
@@ -1434,19 +1496,15 @@ async def dashboard():
       const text = e.target.options[e.target.selectedIndex]?.text || '';
       const norm = (s) => (s || '').toString().trim().toLowerCase();
       const presetMap = new Map([
-        ['инспекторы гбр', 'гбр, охрана'],
-        ['инспектор гбр', 'гбр, охрана'],
-        ['инспекторы перронного контроля', 'склад самолет'],
-        ['инспектор перрон', 'склад самолет'],
         ['врач-терапевт', 'врач терапевт'],
         ['врач терапевт', 'врач терапевт'],
         ['грузчик', 'грузчик склад'],
         ['грузчик склад', 'грузчик склад'],
         ['водитель', 'водитель категория D'],
         ['водитель категория D', 'водитель категория D'],
-        ['водитель спецтехники', 'водитель категория С'],
         ['водитель категория С', 'водитель категория С'],
-        ['уборщик', 'уборщик клининг']
+        ['уборщик', 'уборщик клининг'],
+        ['специалист сбовс', 'уборщик клининг']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
