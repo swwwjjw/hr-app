@@ -97,6 +97,49 @@ def _is_pulkovo_special_equipment_driver(title: str, employer_name: str) -> bool
     except Exception:
         return False
 
+def _is_prohire_company(employer_name: str) -> bool:
+    """Return True if this is from prohire company."""
+    try:
+        employer_lower = (employer_name or "").strip().casefold()
+        return "prohire" in employer_lower
+    except Exception:
+        return False
+
+def _is_doctor_selection(query: str) -> bool:
+    """Return True if the query refers to doctor-related selections."""
+    try:
+        q = (query or "").strip().casefold()
+        return "врач" in q
+    except Exception:
+        return False
+
+def _is_medical_center_21vek(employer_name: str) -> bool:
+    """Return True if this is from медицинский центр XXI век (21 век) company."""
+    try:
+        employer_lower = (employer_name or "").strip().casefold()
+        return ("медицинский центр" in employer_lower and 
+                ("xxi век" in employer_lower or "21 век" in employer_lower or "21век" in employer_lower))
+    except Exception:
+        return False
+
+def _is_cleaner_selection(query: str) -> bool:
+    """Return True if the query refers to cleaner-related selections."""
+    try:
+        q = (query or "").strip().casefold()
+        return "уборщик" in q or "клининг" in q or "сбовс" in q
+    except Exception:
+        return False
+
+def _is_terrrapia_spa_head(employer_name: str) -> bool:
+    """Return True if this is from terrrapia/terrapia spa head company."""
+    try:
+        employer_lower = (employer_name or "").strip().casefold()
+        return (("terrrapia" in employer_lower or "terrapia" in employer_lower) and 
+                "spa" in employer_lower and 
+                "head" in employer_lower)
+    except Exception:
+        return False
+
 def _is_pulkovo_driver_special_equipment(title: str, employer_name: str) -> bool:
     """Return True if this is a specific Pulkovo vacancy to exclude from driver searches."""
     try:
@@ -163,12 +206,36 @@ def _should_exclude_for_selection(query: str, item: Dict[str, Any]) -> bool:
         if _employer_matches_rossgvardiya_szf(employer.get("name")):
             return _salary_is_exact_10000((item or {}).get("salary"))
     
-    # Exclude only specific Pulkovo "Водитель спецтехники в аэропорту" from driver selections
+    # Exclude specific vacancies from driver selections
     if _is_driver_selection(query):
         title = (item or {}).get("name", "")
         employer = (item or {}).get("employer", {})
         employer_name = employer.get("name", "")
+        
+        # Exclude specific Pulkovo "Водитель спецтехники в аэропорту"
         if _is_pulkovo_special_equipment_driver(title, employer_name):
+            return True
+        
+        # Exclude all prohire company vacancies
+        if _is_prohire_company(employer_name):
+            return True
+    
+    # Exclude specific vacancies from doctor selections
+    if _is_doctor_selection(query):
+        employer = (item or {}).get("employer", {})
+        employer_name = employer.get("name", "")
+        
+        # Exclude all медицинский центр XXI век (21 век) company vacancies
+        if _is_medical_center_21vek(employer_name):
+            return True
+    
+    # Exclude specific vacancies from cleaner selections
+    if _is_cleaner_selection(query):
+        employer = (item or {}).get("employer", {})
+        employer_name = employer.get("name", "")
+        
+        # Exclude all terrrapia spa head company vacancies
+        if _is_terrrapia_spa_head(employer_name):
             return True
     
     return False
