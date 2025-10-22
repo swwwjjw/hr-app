@@ -58,187 +58,6 @@ async def root_redirect():
 cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 0
 
-def _is_kpp_selection(query: str) -> bool:
-    """Return True if the query refers to the 'Контролер КПП' selection."""
-    try:
-        q = (query or "").strip().casefold()
-        # Match phrases like 'контролер кпп' even if extra words are present
-        return ("контролер" in q or "контролёр" in q) and "кпп" in q
-    except Exception:
-        return False
-
-def _is_driver_selection(query: str) -> bool:
-    """Return True if the query refers to driver-related selections."""
-    try:
-        q = (query or "").strip().casefold()
-        return "водитель" in q
-    except Exception:
-        return False
-
-def _is_pulkovo_special_equipment_driver(title: str, employer_name: str) -> bool:
-    """Return True if this is the specific Pulkovo 'Водитель спецтехники в аэропорту' vacancy to exclude from driver searches."""
-    try:
-        title_lower = (title or "").strip().casefold()
-        employer_lower = (employer_name or "").strip().casefold()
-        
-        # Check if it's from Pulkovo airport
-        is_pulkovo = "пулково" in employer_lower or "аэропорт пулково" in employer_lower
-        
-        if not is_pulkovo:
-            return False
-        
-        # Exclude only "Водитель спецтехники в аэропорту"
-        if ("водитель" in title_lower and 
-            ("спецтехники" in title_lower or "спецтехника" in title_lower) and
-            "аэропорту" in title_lower):
-            return True
-        
-        return False
-    except Exception:
-        return False
-
-def _is_prohire_company(employer_name: str) -> bool:
-    """Return True if this is from prohire company."""
-    try:
-        employer_lower = (employer_name or "").strip().casefold()
-        return "prohire" in employer_lower
-    except Exception:
-        return False
-
-def _is_doctor_selection(query: str) -> bool:
-    """Return True if the query refers to doctor-related selections."""
-    try:
-        q = (query or "").strip().casefold()
-        return "врач" in q
-    except Exception:
-        return False
-
-def _is_medical_center_21vek(employer_name: str) -> bool:
-    """Return True if this is from медицинский центр XXI век (21 век) company."""
-    try:
-        employer_lower = (employer_name or "").strip().casefold()
-        return ("медицинский центр" in employer_lower and 
-                ("xxi век" in employer_lower or "21 век" in employer_lower or "21век" in employer_lower))
-    except Exception:
-        return False
-
-def _is_cleaner_selection(query: str) -> bool:
-    """Return True if the query refers to cleaner-related selections."""
-    try:
-        q = (query or "").strip().casefold()
-        return "уборщик" in q or "клининг" in q or "сбовс" in q
-    except Exception:
-        return False
-
-def _is_terrrapia_spa_head(employer_name: str) -> bool:
-    """Return True if this is from terrrapia/terrapia spa head company."""
-    try:
-        employer_lower = (employer_name or "").strip().casefold()
-        return (("terrrapia" in employer_lower or "terrapia" in employer_lower) and 
-                "spa" in employer_lower and 
-                "head" in employer_lower)
-    except Exception:
-        return False
-
-def _is_pulkovo_driver_special_equipment(title: str, employer_name: str) -> bool:
-    """Return True if this is a specific Pulkovo vacancy to exclude from driver searches."""
-    try:
-        title_lower = (title or "").strip().casefold()
-        employer_lower = (employer_name or "").strip().casefold()
-        
-        # Check if it's from Pulkovo airport
-        is_pulkovo = "пулково" in employer_lower or "аэропорт пулково" in employer_lower
-        
-        if not is_pulkovo:
-            return False
-        
-        # Exclude specific vacancies:
-        # 1. "Водитель спецтехники в аэропорту"
-        if "водитель" in title_lower and ("спецтехники" in title_lower or "спецтехника" in title_lower):
-            return True
-        
-        # 2. "Машинист компрессора передвижного с двигателем внутреннего сгорания"
-        if ("машинист" in title_lower and "компрессора" in title_lower and 
-            "передвижного" in title_lower and "двигателем" in title_lower):
-            return True
-        
-        # 3. "Водитель с категорией D"
-        if "водитель" in title_lower and "категорией d" in title_lower:
-            return True
-        
-        return False
-    except Exception:
-        return False
-
-def _employer_matches_rossgvardiya_szf(name: str) -> bool:
-    """Robust match for the specified employer name.
-    Target: 'Управление по Северо-Западному федеральному округу Центра охраны объектов промышленности (филиал) ФГУП Охрана Росгвардии'
-    """
-    if not name:
-        return False
-    n = str(name).casefold()
-    return ("фгуп охрана росгвардии" in n) and ("северо-западному федеральному округу" in n)
-
-def _salary_is_exact_10000(salary_obj: Any) -> bool:
-    """Return True if normalized salary equals 10000 or bounds equal 10000."""
-    try:
-        from_val = None
-        to_val = None
-        if isinstance(salary_obj, dict):
-            from_val = salary_obj.get("from")
-            to_val = salary_obj.get("to")
-        norm = normalize_salary(salary_obj)
-        if isinstance(norm, (int, float)) and float(norm) == 10000.0:
-            return True
-        if isinstance(from_val, (int, float)) and float(from_val) == 10000.0:
-            return True
-        if isinstance(to_val, (int, float)) and float(to_val) == 10000.0:
-            return True
-    except Exception:
-        return False
-    return False
-
-def _should_exclude_for_selection(query: str, item: Dict[str, Any]) -> bool:
-    """Exclude specific vacancies based on query type."""
-    # Exclude specific employer's vacancy with salary 10000 for 'Контролер КПП' selection
-    if _is_kpp_selection(query):
-        employer = (item or {}).get("employer") or {}
-        if _employer_matches_rossgvardiya_szf(employer.get("name")):
-            return _salary_is_exact_10000((item or {}).get("salary"))
-    
-    # Exclude specific vacancies from driver selections
-    if _is_driver_selection(query):
-        title = (item or {}).get("name", "")
-        employer = (item or {}).get("employer", {})
-        employer_name = employer.get("name", "")
-        
-        # Exclude specific Pulkovo "Водитель спецтехники в аэропорту"
-        if _is_pulkovo_special_equipment_driver(title, employer_name):
-            return True
-        
-        # Exclude all prohire company vacancies
-        if _is_prohire_company(employer_name):
-            return True
-    
-    # Exclude specific vacancies from doctor selections
-    if _is_doctor_selection(query):
-        employer = (item or {}).get("employer", {})
-        employer_name = employer.get("name", "")
-        
-        # Exclude all медицинский центр XXI век (21 век) company vacancies
-        if _is_medical_center_21vek(employer_name):
-            return True
-    
-    # Exclude specific vacancies from cleaner selections
-    if _is_cleaner_selection(query):
-        employer = (item or {}).get("employer", {})
-        employer_name = employer.get("name", "")
-        
-        # Exclude all terrrapia spa head company vacancies
-        if _is_terrrapia_spa_head(employer_name):
-            return True
-    
-    return False
 
 def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
     """Generate a cache key from query parameters."""
@@ -426,7 +245,6 @@ async def analyze(
         schedule_obj = item.get("schedule") or {}
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
-            # Exclude targeted vacancy from the 'Контролер КПП' selection
               filtered_items.append(item)
     
     # Use parsed vacancies so per-shift monthly estimates are considered
@@ -1219,10 +1037,18 @@ async def dashboard():
           if (monthly > salaryUpperCap) {
             return null;
           }
+          // Check if it's a highlighted company that should have larger bubble size
+          const isHighlightedCompany = isPulkovo || isRossiya || 
+            (v.employer_name && v.employer_name.includes('Петербургский Метрополитен')) ||
+            (v.employer_name && v.employer_name.includes('АО Зенит-Арена')) ||
+            (v.employer_name && v.employer_name.includes('Ozon')) ||
+            (v.employer_name && v.employer_name.includes('Теремок')) ||
+            (v.employer_name && v.employer_name.includes('WILDBERRIES'));
+          
           return {
             x: monthly,
             y: rating,
-            r: isPulkovo ? 12 : (isRossiya ? 12 : 6), // Larger bubble for Pulkovo and Rossiya
+            r: isHighlightedCompany ? 12 : 6, // Larger bubble for highlighted companies
             title: v.title || '',
             employer: v.employer_name || '',
             isPulkovo: isPulkovo
@@ -1328,12 +1154,30 @@ async def dashboard():
       // Separate companies into different datasets
       const pulkovoPoints = points.filter(p => p.isPulkovo);
       const rossiyaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Россия'));
-      const otherPoints = points.filter(p => !p.isPulkovo && !(p.employer && p.employer.includes('Авиакомпания Россия')));
+      const metroPoints = points.filter(p => p.employer && p.employer.includes('Петербургский Метрополитен'));
+      const zenitPoints = points.filter(p => p.employer && p.employer.includes('АО Зенит-Арена'));
+      const ozonPoints = points.filter(p => p.employer && p.employer.includes('Ozon'));
+      const teremokPoints = points.filter(p => p.employer && p.employer.includes('Теремок'));
+      const wildberriesPoints = points.filter(p => p.employer && p.employer.includes('WILDBERRIES'));
+      const otherPoints = points.filter(p => 
+        !p.isPulkovo && 
+        !(p.employer && p.employer.includes('Авиакомпания Россия')) &&
+        !(p.employer && p.employer.includes('Петербургский Метрополитен')) &&
+        !(p.employer && p.employer.includes('АО Зенит-Арена')) &&
+        !(p.employer && p.employer.includes('Ozon')) &&
+        !(p.employer && p.employer.includes('Теремок')) &&
+        !(p.employer && p.employer.includes('WILDBERRIES'))
+      );
       
       console.log('Chart datasets:', {
         totalPoints: points.length,
         pulkovoCount: pulkovoPoints.length,
         rossiyaCount: rossiyaPoints.length,
+        metroCount: metroPoints.length,
+        zenitCount: zenitPoints.length,
+        ozonCount: ozonPoints.length,
+        teremokCount: teremokPoints.length,
+        wildberriesCount: wildberriesPoints.length,
         otherCount: otherPoints.length,
         rossiyaSample: rossiyaPoints.slice(0, 2)
       });
@@ -1384,6 +1228,56 @@ async def dashboard():
               hoverBackgroundColor: 'rgba(239, 68, 68, 0.7)',
               hoverBorderColor: 'rgba(239, 68, 68, 1)',
               hoverBorderWidth: 2
+            },
+            {
+              label: 'Петербургский Метрополитен',
+              data: metroPoints,
+              backgroundColor: 'rgba(6, 57, 112, 0.5)',
+              borderColor: 'rgba(6, 57, 112, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(6, 57, 112, 0.8)',
+              hoverBorderColor: 'rgba(6, 57, 112, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'АО Зенит-Арена',
+              data: zenitPoints,
+              backgroundColor: 'rgba(1, 201, 88, 0.5)',
+              borderColor: 'rgba(1, 201, 88, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(1, 201, 88, 0.8)',
+              hoverBorderColor: 'rgba(1, 201, 88, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'Ozon',
+              data: ozonPoints,
+              backgroundColor: 'rgba(255, 165, 0, 0.5)',
+              borderColor: 'rgba(255, 165, 0, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(255, 165, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 165, 0, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'Теремок',
+              data: teremokPoints,
+              backgroundColor: 'rgba(255, 99, 132, 0.5)',
+              borderColor: 'rgba(255, 99, 132, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(255, 99, 132, 0.8)',
+              hoverBorderColor: 'rgba(255, 99, 132, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'WILDBERRIES',
+              data: wildberriesPoints,
+              backgroundColor: 'rgba(147, 51, 234, 0.5)',
+              borderColor: 'rgba(147, 51, 234, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(147, 51, 234, 0.8)',
+              hoverBorderColor: 'rgba(147, 51, 234, 1)',
+              hoverBorderWidth: 3
             }
           ]
         },
@@ -1406,7 +1300,13 @@ async def dashboard():
                 color: '#64748b',
                 padding: 8,
                 usePointStyle: true,
-                pointStyle: 'circle'
+                pointStyle: 'circle',
+                filter: function(legendItem, chartData) {
+                  // Only show legend items for datasets that have data points
+                  const datasetIndex = legendItem.datasetIndex;
+                  const dataset = chartData.datasets[datasetIndex];
+                  return dataset.data && dataset.data.length > 0;
+                }
               }
             },
             tooltip: {
@@ -1491,7 +1391,7 @@ async def dashboard():
       });
 
       // Create salary histogram
-      createSalaryHistogram(salaries, s);
+      createSalaryHistogram(salaries, s, items);
 
       // Resume stats card - automatically collect resume IDs
       try {
@@ -1620,7 +1520,7 @@ async def dashboard():
     });
     
     // Function to create salary histogram
-    function createSalaryHistogram(salaries, salaryStats) {
+    function createSalaryHistogram(salaries, salaryStats, itemsData) {
       const histogramCanvas = document.getElementById('salaryHistogram');
       if (!histogramCanvas) return;
       
@@ -1675,7 +1575,7 @@ async def dashboard():
       for (let i = 0; i < numBins; i++) {
         const binStart = Math.floor(minSalary / binWidth) * binWidth + i * binWidth;
         const binEnd = binStart + binWidth;
-        bins.push({ start: binStart, end: binEnd, count: 0 });
+        bins.push({ start: binStart, end: binEnd, count: 0, hasPulkovo: false });
         // Show range for better clarity
         if (i === numBins - 1) {
           binLabels.push((binStart / 1000).toFixed(0) + 'k+');
@@ -1692,6 +1592,35 @@ async def dashboard():
         }
       });
       
+      // Check which bins contain Pulkovo vacancies using the items data from bubble chart
+      if (typeof itemsData !== 'undefined' && itemsData.length > 0) {
+        itemsData.forEach(v => {
+          // Compute monthly salary value, converting per-shift to monthly when available
+          let monthly = null;
+          if (v.salary_per_shift === true) {
+            if (typeof v.salary_estimated_monthly === 'number') {
+              monthly = v.salary_estimated_monthly;
+            }
+          } else if (typeof v.salary_avg === 'number') {
+            monthly = v.salary_avg;
+          }
+          if (monthly === null && v.salary && typeof v.salary === 'object') {
+            const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
+            const st = (typeof v.salary.to === 'number') ? v.salary.to : null;
+            if (sf !== null && st !== null) monthly = (sf + st) / 2;
+            else if (sf !== null) monthly = sf;
+            else if (st !== null) monthly = st;
+          }
+          
+          if (monthly !== null && monthly >= 13000) {
+            const binIndex = Math.floor((monthly - bins[0].start) / binWidth);
+            if (binIndex >= 0 && binIndex < bins.length && isPulkovoEmployerName(v.employer_name)) {
+              bins[binIndex].hasPulkovo = true;
+            }
+          }
+        });
+      }
+      
       // Find the median value for marking
       const median = salaryStats?.median || 0;
       
@@ -1702,9 +1631,9 @@ async def dashboard():
           datasets: [{
             label: 'Количество вакансий',
             data: bins.map(bin => bin.count),
-            backgroundColor: 'rgba(59, 130, 246, 0.8)',
-            borderColor: 'rgba(59, 130, 246, 1)',
-            borderWidth: 1,
+            backgroundColor: bins.map(bin => bin.hasPulkovo ? 'rgba(6, 182, 212, 0.9)' : 'rgba(59, 130, 246, 0.8)'),
+            borderColor: bins.map(bin => bin.hasPulkovo ? 'rgba(6, 182, 212, 1)' : 'rgba(59, 130, 246, 1)'),
+            borderWidth: bins.map(bin => bin.hasPulkovo ? 3 : 1),
             borderRadius: 4
           }]
         },
@@ -1718,7 +1647,35 @@ async def dashboard():
           },
           plugins: {
             legend: {
-              display: false
+              display: true,
+              position: 'bottom',
+              align: 'center',
+              labels: {
+                font: {
+                  size: 10,
+                  weight: '400'
+                },
+                color: '#c7d1dd',
+                padding: 4,
+                usePointStyle: true,
+                pointStyle: 'rect',
+                generateLabels: function(chart) {
+                  const hasPulkovo = bins.some(bin => bin.hasPulkovo);
+                  if (hasPulkovo) {
+                    return [{
+                      text: 'Пулково',
+                      fillStyle: 'rgba(6, 182, 212, 0.9)',
+                      strokeStyle: 'rgba(6, 182, 212, 1)',
+                      lineWidth: 2,
+                      pointStyle: 'rect',
+                      hidden: false,
+                      index: 0,
+                      fontColor: '#c7d1dd'
+                    }];
+                  }
+                  return [];
+                }
+              }
             },
             tooltip: {
               backgroundColor: 'rgba(30, 41, 59, 0.95)',
@@ -1738,12 +1695,16 @@ async def dashboard():
                   return 'Вакансий: ' + context.parsed.y;
                 },
                 afterLabel: function(context) {
-                  const binIndex = context.dataIndex;
+                  const binIndex = context[0].dataIndex;
                   const bin = bins[binIndex];
-                  if (median >= bin.start && median < bin.end) {
-                    return '📊 Медиана: ' + Math.round(median).toLocaleString() + '₽';
+                  let result = '';
+                  if (bin.hasPulkovo) {
+                    result += '✈️ Содержит вакансии Аэропорт Пулково\n';
                   }
-                  return '';
+                  if (median >= bin.start && median < bin.end) {
+                    result += '📊 Медиана: ' + Math.round(median).toLocaleString() + '₽';
+                  }
+                  return result;
                 }
               }
             }
