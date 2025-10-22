@@ -194,7 +194,6 @@ export const App: React.FC = () => {
 
       {/* Tabs */}
       <div className="tabs" style={{ marginBottom: 16 }}>
-        <button className={activeTab === 'vacancies' ? 'tab active' : 'tab'} onClick={() => setActiveTab('vacancies')}>Вакансии</button>
         <button className={activeTab === 'competitors' ? 'tab active' : 'tab'} onClick={() => setActiveTab('competitors')}>Конкуренты</button>
       </div>
 
@@ -213,9 +212,7 @@ export const App: React.FC = () => {
           </button>
         )}
         {activeTab === 'competitors' && (
-          <button onClick={() => setActiveTab('vacancies')} title="Перейти к вкладке вакансий">
-            К вакансиям
-          </button>
+          null
         )}
       </div>
 
