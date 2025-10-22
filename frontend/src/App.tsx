@@ -152,6 +152,11 @@ export const App: React.FC = () => {
           ))}
         </select>
         <button onClick={load} disabled={loading}>Найти</button>
+        {activeTab === 'vacancies' && (
+          <button onClick={() => setActiveTab('competitors')} title="Перейти к вкладке конкурентов">
+            К конкурентам
+          </button>
+        )}
       </div>
 
       {activeTab === 'vacancies' && data && (
