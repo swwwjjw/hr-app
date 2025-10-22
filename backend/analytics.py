@@ -21,8 +21,8 @@ def salary_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
         if val is None:
             val = normalize_salary(v.get("salary"))
         raw.append(val if isinstance(val, (int, float)) else None)
-    # Filter out invalid/likely per-shift small values (< 10 000₽)
-    MIN_VALID_MONTHLY = 10000.0
+    # Filter out invalid/likely per-shift small values (< 13 000₽)
+    MIN_VALID_MONTHLY = 13000.0
     salaries = [s for s in raw if s is not None and float(s) >= MIN_VALID_MONTHLY]
     if not salaries:
         return {"count": 0, "avg": None, "median": None, "min": None, "max": None}

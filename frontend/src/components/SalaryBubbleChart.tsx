@@ -51,7 +51,7 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
     // Robust outlier filtering based on IQR (exclude extreme single values)
     const validMonthlyValues = (items || [])
       .map(toMonthly)
-      .filter((v): v is number => typeof v === 'number' && v >= 10000);
+      .filter((v): v is number => typeof v === 'number' && v >= 13000);
 
     const sorted = validMonthlyValues.slice().sort((a, b) => a - b);
     const quantile = (arr: number[], p: number): number => {
@@ -70,7 +70,7 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
       .map((i) => {
         const monthly = toMonthly(i);
         const employerMark = typeof i?.employer_mark === 'number' ? (i.employer_mark as number) : null;
-        if (monthly === null || employerMark === null || monthly < 10000) {
+        if (monthly === null || employerMark === null || monthly < 13000) {
           return null;
         }
         // Filter out extreme outliers by salary
