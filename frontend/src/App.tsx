@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchAnalyze, fetchResumeStats } from './api/client';
+import { fetchAnalyze, fetchResumeStats, fetchSimplifiedVacancies } from './api/client';
 import { SalaryBubbleChart } from './components/SalaryBubbleChart';
 import { SalaryStatsCard } from './components/SalaryStatsCard';
+import { HourlyStatsCard } from './components/HourlyStatsCard';
 import WordCloud from 'wordcloud';
 
 export const App: React.FC = () => {
@@ -12,6 +13,12 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
   const [resumeStats, setResumeStats] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'vacancies' | 'competitors'>('vacancies');
+
+  // Competitor tab state
+  const [competitorLoading, setCompetitorLoading] = useState(false);
+  const [competitorItems, setCompetitorItems] = useState<any[]>([]);
+  const [selectedEmployer, setSelectedEmployer] = useState<string>('');
 
   const presets = useMemo(() => [
     { value: 'контролер кпп', label: 'Инспекторы-контролёры' },
@@ -39,11 +46,104 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load competitor items when switching to competitors tab or when query changes
+  useEffect(() => {
+    const loadCompetitors = async () => {
+      if (activeTab !== 'competitors') return;
+      setCompetitorLoading(true);
+      try {
+        const res = await fetchSimplifiedVacancies({
+          query,
+          area,
+          pages,
+          per_page: perPage,
+          employer_mark: true,
+          fetch_all: true,
+        });
+        const items = Array.isArray(res?.items) ? res.items : [];
+        setCompetitorItems(items);
+        // Set default employer if not chosen yet
+        if (!selectedEmployer) {
+          // choose the most frequent employer
+          const counts = new Map<string, number>();
+          for (const it of items) {
+            const name = (it?.employer_name || '').toString().trim();
+            if (!name) continue;
+            counts.set(name, (counts.get(name) || 0) + 1);
+          }
+          const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+          setSelectedEmployer(top);
+        }
+      } finally {
+        setCompetitorLoading(false);
+      }
+    };
+    loadCompetitors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, query]);
+
+  const competitorOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    (competitorItems || []).forEach((it) => {
+      const name = (it?.employer_name || '').toString().trim();
+      if (!name) return;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name);
+  }, [competitorItems]);
+
+  const competitorHourly = useMemo(() => {
+    if (!selectedEmployer) return {} as any;
+    // Build monthly salaries for the selected employer, excluding per-shift and requiring schedule
+    const HOURS_PER_MONTH = 164.0;
+    const monthly: number[] = [];
+    for (const v of competitorItems || []) {
+      const employerName = (v?.employer_name || '').toString();
+      if (!employerName || employerName !== selectedEmployer) continue;
+      if (v?.salary_per_shift === true) continue; // exclude per-shift
+      if (!v?.schedule) continue; // need schedule to treat as hourly-based role
+      let m: number | null = null;
+      if (typeof v?.salary_avg === 'number') {
+        m = v.salary_avg as number;
+      } else if (v?.salary && typeof v.salary === 'object') {
+        const sf = typeof v.salary.from === 'number' ? (v.salary.from as number) : null;
+        const st = typeof v.salary.to === 'number' ? (v.salary.to as number) : null;
+        if (sf !== null && st !== null) m = (sf + st) / 2;
+        else if (sf !== null) m = sf;
+        else if (st !== null) m = st;
+      }
+      if (m !== null && m >= 10000) {
+        monthly.push(m);
+      }
+    }
+    if (!monthly.length) return {} as any;
+    const hourly = monthly.map((m) => m / HOURS_PER_MONTH).sort((a, b) => a - b);
+    const avg = hourly.reduce((a, b) => a + b, 0) / hourly.length;
+    const n = hourly.length;
+    const median = n % 2 === 1 ? hourly[(n - 1) / 2] : (hourly[n / 2 - 1] + hourly[n / 2]) / 2;
+    return {
+      min: hourly[0],
+      median,
+      avg,
+      max: hourly[hourly.length - 1],
+      count: hourly.length,
+    } as any;
+  }, [competitorItems, selectedEmployer]);
+
   return (
     <div className="container">
       <h1>Аналитика вакансий</h1>
       <div className="meta">📍 Санкт-Петербург</div>
 
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: 16 }}>
+        <button className={activeTab === 'vacancies' ? 'tab active' : 'tab'} onClick={() => setActiveTab('vacancies')}>Вакансии</button>
+        <button className={activeTab === 'competitors' ? 'tab active' : 'tab'} onClick={() => setActiveTab('competitors')}>Конкуренты</button>
+      </div>
+
+      {/* Shared controls for query selection */}
       <div className="controls">
         <select value={query} onChange={(e) => setQuery(e.target.value)}>
           <option value="">Выберите вакансию</option>
@@ -54,7 +154,7 @@ export const App: React.FC = () => {
         <button onClick={load} disabled={loading}>Найти</button>
       </div>
 
-      {data && (
+      {activeTab === 'vacancies' && data && (
         <div className="row">
           <div className="card">
             <h3>Зарплата vs Рейтинг работодателя</h3>
@@ -67,7 +167,7 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {resumeStats && (
+      {activeTab === 'vacancies' && resumeStats && (
         <div className="card" style={{ marginTop: 24 }}>
           <h3>Статистика резюме</h3>
           <div className="meta">Резюме (всего: {resumeStats.total_resumes || 0}, активные: {resumeStats.active_resumes || 0})</div>
@@ -77,6 +177,24 @@ export const App: React.FC = () => {
             <div className="miniCard"><div>Вакансий по запросу</div><b>{resumeStats.vacancy_count ?? '—'}</b></div>
             <div className="miniCard"><div>Резюме на вакансию</div><b>{typeof resumeStats.resumes_per_vacancy === 'number' ? resumeStats.resumes_per_vacancy.toFixed(2) : '—'}</b></div>
           </div>
+        </div>
+      )}
+
+      {/* Competitors Tab */}
+      {activeTab === 'competitors' && (
+        <div className="card">
+          <h3>ЧТС по конкурентам</h3>
+          <div className="controls" style={{ marginTop: 8 }}>
+            <select value={selectedEmployer} onChange={(e) => setSelectedEmployer(e.target.value)}>
+              <option value="">Выберите компанию</option>
+              {competitorOptions.map((name) => (
+                <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
+              ))}
+            </select>
+            <button onClick={() => setActiveTab('competitors')} disabled={competitorLoading}>Обновить</button>
+          </div>
+          <div className="meta">{selectedEmployer || 'Компания не выбрана'}</div>
+          <HourlyStatsCard hourly={competitorHourly} />
         </div>
       )}
     </div>
