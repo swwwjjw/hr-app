@@ -46,6 +46,15 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Respect query parameter tab=competitors to open the competitors tab on load
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const tab = sp.get('tab');
+    if (tab === 'competitors') {
+      setActiveTab('competitors');
+    }
+  }, []);
+
   // Load competitor items when switching to competitors tab or when query changes
   useEffect(() => {
     const loadCompetitors = async () => {
