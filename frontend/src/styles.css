@@ -15,3 +15,19 @@ body {
 .controls input, .controls button, .controls select { padding: 8px 10px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 @media (max-width: 900px) { .row { grid-template-columns: 1fr; } .grid4 { grid-template-columns: 1fr 1fr; } }
+
+/* Tabs */
+.tabs { display: flex; gap: 8px; }
+.tab {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tab.active {
+  background: #e8f0ff;
+  border-color: #3b82f6;
+  color: #1e3a8a;
+  font-weight: 600;
+}
