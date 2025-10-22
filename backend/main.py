@@ -903,7 +903,7 @@ async def dashboard():
           if (st !== null) return st;
         }
         return null;
-      }).filter(x => typeof x === 'number' && x >= 10000).sort((a,b) => a-b);
+      }).filter(x => typeof x === 'number' && x >= 13000).sort((a,b) => a-b);
 
       // Percentile helper
       const percentile = (arr, p) => {
@@ -1034,7 +1034,7 @@ async def dashboard():
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
 
-          if (monthly === null || rating === null || monthly < 10000) {
+          if (monthly === null || rating === null || monthly < 13000) {
             return null;
           }
           // Hide extreme salary outliers from the bubble chart
