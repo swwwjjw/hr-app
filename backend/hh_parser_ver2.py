@@ -51,7 +51,7 @@ async def fetch_resume_ids_by_query(query: str, area: Optional[int] = None, page
     resume_ids = []
     for i in range(count):
         # Generate a realistic-looking resume ID
-        mock_id = f"{random.randint(10000000, 99999999)}"
+        mock_id = f"{random.randint(00000000, 99999999)}"
         resume_ids.append(mock_id)
     
     return resume_ids
@@ -111,12 +111,12 @@ def normalize_salary(salary: Optional[Dict[str, Any]]) -> Optional[float]:
 
 
 def _parse_number(text: str) -> Optional[float]:
-    """Parse a number like '3 500', '3500', '3.500', '3,500' to float.
+    """Parse an integer-like number from text (e.g., '3 500', '3500', '3.500', '3,500').
+    Intended for counts, not monetary values with units like 'тыс'.
     Returns None if not found.
     """
     try:
-        cleaned = text.replace("\xa0", " ")
-        # Keep digits and separators
+        cleaned = (text or "").replace("\xa0", " ")
         cleaned = cleaned.replace(" ", "").replace(",", "").replace(".", "")
         if cleaned.isdigit():
             return float(cleaned)
@@ -125,11 +125,60 @@ def _parse_number(text: str) -> Optional[float]:
     return None
 
 
+def _parse_ruble_amount(text_full: str, numeric_group: Optional[str] = None) -> Optional[float]:
+    """Parse a ruble amount that may include thousand units like 'тыс', 'т.р', 'тр', or 'k/к'.
+    - text_full: the full matched snippet (to detect unit markers around the number)
+    - numeric_group: the numeric part captured by regex (with separators)
+    Returns the amount in rubles as float.
+    """
+    try:
+        sample = (numeric_group if isinstance(numeric_group, str) and numeric_group.strip() else text_full) or ""
+        # Extract numeric value allowing decimals (e.g., '4,5') and thousand separators ('3.500', '3,500', '3 500')
+        s = sample.replace("\xa0", " ").strip()
+        # Patterns indicating thousand-grouped integer like '3.500' or '3,500'
+        thousand_grouped = re.fullmatch(r"\d{1,3}[\.,]\d{3}", s) is not None
+        spaced_grouped = re.fullmatch(r"\d{1,3}(?:\s\d{3})+", s) is not None
+        decimal_number = re.fullmatch(r"\d+[\.,]\d+", s) is not None
+        base_num: Optional[float]
+        if spaced_grouped:
+            base_num = float(re.sub(r"\s+", "", s))
+        elif thousand_grouped and not decimal_number:
+            base_num = float(re.sub(r"[\.,]", "", s))
+        elif decimal_number:
+            # Normalize comma to dot and parse as float (e.g., '4,5' -> 4.5)
+            base_num = float(s.replace(",", "."))
+        else:
+            # Fallback to integer-like parser (removes separators)
+            base_num = _parse_number(s)
+        if not isinstance(base_num, (int, float)):
+            return None
+
+        ctx = (text_full or "").lower()
+        # Detect thousand markers near the number
+        has_thousand_marker = False
+        # Common Russian abbreviations and Latin 'k'
+        thousand_markers = [
+            r"тыс", r"тысяч", r"т\.?\s*р\.?", r"тр\b", r"k\b", r"к\b",
+        ]
+        for mpat in thousand_markers:
+            if re.search(mpat, ctx):
+                has_thousand_marker = True
+                break
+
+        # If thousand marker present and value is plausibly in thousands (<= 1000), multiply
+        if has_thousand_marker and base_num <= 1000:
+            return float(base_num * 1000.0)
+        return float(base_num)
+    except Exception:
+        return None
+
+
 def estimate_monthly_salary_from_text(title: str, responsibility: str, requirement: Optional[str], description_text: str) -> Optional[float]:
     """Extract per-shift pay and convert to an estimated monthly salary.
 
     Improvements over the old heuristic:
-      - Recognizes more per-shift patterns ("₽/смена", "руб/смену", "за смену", "смена — 4500")
+      - Recognizes more per-shift patterns ("₽/смена", "руб/смену", "за смену", "смена — 4500",
+        "сменный график: 4500", "график сменный — 4500")
       - Supports numeric ranges for per-shift pay (e.g., "4500–5500 руб/смена")
       - Detects declared number of shifts per month/week (e.g., "18 смен в месяц", "3 смены в неделю")
       - Infers monthly number of shifts from schedules like "2/2", "5/2", "1/3", and phrases like
@@ -145,9 +194,9 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             (description_text or ""),
         ]).lower()
 
-        # Guard: only proceed if vacancy mentions shift-based payment
-        if not re.search(r"\b(смена|смены|за\s+смену|/\s*смен[ау]|посменн)\b", blob):
-            return None
+        # Note: do not hard-guard on keywords like "смена" here.
+        # We rely on explicit per-shift patterns below to avoid false negatives
+        # (e.g., phrases like "посменно" would be missed by a strict \b...\b check).
 
         # --- 1) Extract per-shift pay candidates ---
         candidates: List[float] = []
@@ -161,33 +210,69 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
                 candidates.append(float(val))
 
         # Patterns where number follows an explicit per-shift marker
+        # Accept common short forms for "shift" like "см." in addition to "смена/смену/смены"
+        # Also accept colloquial Russian synonyms like "выход" and 24h shift term "сутки"
+        SHIFT_TOKEN = r"(?:смен[ауыее]?|см\.?|выход\w*|сутк\w*)(?=\b)"
+        # English variants occasionally appear in mixed-language posts
+        SHIFT_TOKEN_EN = r"(?:per\s*shift|/\s*shift|a\s*shift)(?=\b)"
+
+        # Common representations of ruble units, including word forms like "рублей/рубля/рубли/рубль"
+        RUBLE_UNITS = r"(?:₽|р\.?|руб\.?|rub|rur|rubles?|ruble|рубл(?:ей|я|и|ь)?)"
+
         patterns_simple = [
-            # за смену 3 500, оплата за смену: 4000, 4000 за смену
-            r"за\s+смену\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})",
-            r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*(?:/\s*смен[ау]|за\s+смен[уы])",
-            # смена 4500 руб, смена: 4500
-            r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?",
-            # 4500₽/смена, 4500 руб/смену, 4500 р/смена
-            r"([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*/\s*смен[ау]",
+            # за смену 3 500, оплата за смену: 4000, 4000 за смену, за см. 4000
+            rf"за\s+(?:{SHIFT_TOKEN})\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            # 4500 рублей за смену, 4500 р за смену, 4500 ₽/смена
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
+            # смена 4500 руб, смена: 4500, см. 4500
+            rf"{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            # 4500₽/смена, 4500 руб/смену, 4500 р/смена, 4.5 тыс/см.
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*/\s*{SHIFT_TOKEN}(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            # 4,5 тыс/см. — thousand marker before the /shift token
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к)\s*/\s*{SHIFT_TOKEN}",
+            # посменная оплата: 4500, посменно 4500
+            rf"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?(?:\s*(?:тыс\.?|тысяч|т\.?\s*р\.?|тр|k|к))?",
+            # сменный график: 4500, график сменный — 4500 (require boundary after number, avoid monthly markers nearby)
+            rf"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})(?=(?:\s*(?:{RUBLE_UNITS}))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
+            # 4500 в смену / в сутки / за выход (common colloquialisms)
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:в\s+{SHIFT_TOKEN})",
+            # Bare unitless: 4500 руб смена / 4500 руб сутки
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})\s*{SHIFT_TOKEN}",
+            # English: 4000 RUB per shift, 4000 per shift, 4000₽/shift
+            rf"([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:{SHIFT_TOKEN_EN})",
+            # оплата смены: 4500, ставка за смену 4500
+            rf"(?:оплата|ставка)\s+{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?",
+            rf"(?:оплата|ставка)\s*(?:за\s+)?{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?",
         ]
 
         for pat in patterns_simple:
             for m in re.finditer(pat, blob):
-                val = _parse_number(m.group(1))
+                val = _parse_ruble_amount(m.group(0), m.group(1))
                 if isinstance(val, (int, float)):
                     simple_candidates.append(float(val))
 
         # Ranges near explicit per-shift markers: 3500-4500 за смену, 3 500 / 4 500 р/смена
         range_patterns = [
-            r"([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:₽|р\.?|руб\.?|rub|rur)?\s*(?:/\s*смен[ау]|за\s+смен[уы])",
-            r"за\s+смену\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
-            r"смена\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})",
+            # 3500-4500 р/смена, 3 500 / 4 500 за смену, 4-5 т.р/см.
+            rf"([0-9][0-9\s\.,]{{2,}})\s*[\-–—/]\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
+            # за смену 4000–5000
+            rf"за\s+{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*[\-–—/]\s*([0-9][0-9\s\.,]{{2,}})",
+            # смена: 4000–5000, см.: 4000/5000
+            rf"{SHIFT_TOKEN}\s*[:\-–—]?\s*([0-9][0-9\s\.,]{{2,}})\s*[\-–—/]\s*([0-9][0-9\s\.,]{{2,}})",
+            # посменная оплата: 4000–5000
+            rf"посмен\w*\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})\s*(?:{RUBLE_UNITS})?",
+            # сменный график: 4000–5000, график сменный — 4000/5000 (require boundary and avoid monthly markers nearby)
+            rf"(?:сменн\w*\s+график(?:\s*работы)?|график(?:\s+работы)?\s+сменн\w*)\s*(?:оплата|ставка)?\s*[:\-–—]?\s*([0-9][0-9\s\.,]{2,})\s*[\-–—/]\s*([0-9][0-9\s\.,]{2,})(?=(?:\s*(?:{RUBLE_UNITS}))?\b)(?![\s\S]{0,20}\b(?:/?\s*мес(?:яц)?|в\s*месяц|/\s*month|per\s*month)\b)",
+            # Ranges with explicit 'от ... до ...' near shift marker, any order
+            rf"(?:за\s+{SHIFT_TOKEN}\s*)?от\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS}|тыс\.?|т\.?\s*р\.?|тр|k|к)?\s*до\s*([0-9][0-9\s\.,]{{2,}}).{{0,20}}(?:/\s*{SHIFT_TOKEN}|за\s+{SHIFT_TOKEN})",
+            # English range: 4000-5000 per shift
+            rf"([0-9][0-9\s\.,]{{2,}})\s*[\-–—/]\s*([0-9][0-9\s\.,]{{2,}})\s*(?:{RUBLE_UNITS})?\s*(?:{SHIFT_TOKEN_EN})",
         ]
 
         for pat in range_patterns:
             for m in re.finditer(pat, blob):
-                v1 = _parse_number(m.group(1))
-                v2 = _parse_number(m.group(2))
+                v1 = _parse_ruble_amount(m.group(0), m.group(1))
+                v2 = _parse_ruble_amount(m.group(0), m.group(2))
                 if isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
                     range_candidates.append((float(v1) + float(v2)) / 2.0)
 
@@ -208,6 +293,23 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
             r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*мес(?:яц)?|/\s*мес)\b",
             blob,
         )
+        # Also match reversed form: 'в мес N смен'
+        if not m_month:
+            m_month = re.search(
+                r"(?:в\s*мес(?:яц)?|/\s*мес)\s*(\d{1,2})\s*смен[аы]?\b",
+                blob,
+            )
+        # Support synonyms: "выходов" and "суток" per month
+        if not m_month:
+            m_month = re.search(
+                r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*(?:выход\w*|сутк\w*)\s*(?:в\s*мес(?:яц)?|/\s*мес)\b",
+                blob,
+            )
+        if not m_month:
+            m_month = re.search(
+                r"(?:в\s*мес(?:яц)?|/\s*мес)\s*(\d{1,2})\s*(?:выход\w*|сутк\w*)\b",
+                blob,
+            )
         if m_month:
             low = _parse_number(m_month.group(1))
             hi = _parse_number(m_month.group(2)) if m_month.lastindex and m_month.group(2) else None
@@ -223,6 +325,22 @@ def estimate_monthly_salary_from_text(title: str, responsibility: str, requireme
                 r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*смен[аы]?\s*(?:в\s*недел[юи]|/\s*нед)\b",
                 blob,
             )
+            if not m_week:
+                m_week = re.search(
+                    r"(?:в\s*недел[юи]|/\s*нед)\s*(\d{1,2})\s*смен[аы]?\b",
+                    blob,
+                )
+            # Synonyms: выходов/суток в неделю
+            if not m_week:
+                m_week = re.search(
+                    r"(\d{1,2})\s*(?:[\-–—]{1}\s*(\d{1,2}))?\s*(?:выход\w*|сутк\w*)\s*(?:в\s*недел[юи]|/\s*нед)\b",
+                    blob,
+                )
+            if not m_week:
+                m_week = re.search(
+                    r"(?:в\s*недел[юи]|/\s*нед)\s*(\d{1,2})\s*(?:выход\w*|сутк\w*)\b",
+                    blob,
+                )
             if m_week:
                 low = _parse_number(m_week.group(1))
                 hi = _parse_number(m_week.group(2)) if m_week.lastindex and m_week.group(2) else None

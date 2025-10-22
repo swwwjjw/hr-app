@@ -387,9 +387,7 @@ async def fetch(
         schedule_obj = item.get("schedule") or {}
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
-            # Exclude targeted vacancy from the 'Контролер КПП' selection
-            if not _should_exclude_for_selection(query, item):
-                filtered_items.append(item)
+              filtered_items.append(item)
     
     if simplified:
         parsed = await parse_vacancies(filtered_items, with_employer_mark=employer_mark)
@@ -429,8 +427,7 @@ async def analyze(
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
             # Exclude targeted vacancy from the 'Контролер КПП' selection
-            if not _should_exclude_for_selection(query, item):
-                filtered_items.append(item)
+              filtered_items.append(item)
     
     # Use parsed vacancies so per-shift monthly estimates are considered
     parsed_for_stats = await parse_vacancies(filtered_items, with_employer_mark=False)
@@ -469,7 +466,7 @@ async def resume_stats(
                 query=vacancy_query, 
                 area=area, 
                 pages=1,  # Limit to 1 page for performance
-                per_page=20  # Limit to 20 resumes for performance
+                per_page=50  # Limit to 20 resumes for performance
             )
             resume_ids = auto_resume_ids
         except Exception as e:
@@ -771,9 +768,12 @@ async def dashboard():
       <option value="">Выберите вакансию</option>
       <option value="контролер кпп">Инспекторы-контролёры</option>
       <option value="инспектор досмотр">Инспекторы по досмотру</option>
+      <!-- <option value="инспектор перрон">Инспекторы перронного контроля</option> -->
+      <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
       <option value="врач терапевт">Врач-терапевт</option>
               <!-- <option value="грузчик склад">Грузчик</option> -->
               <option value="водитель категория D">Водитель</option>
+              <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
     <button id="apply">Найти</button>
@@ -1067,7 +1067,7 @@ async def dashboard():
       const items = Array.isArray(fdata.items) ? fdata.items : [];
       console.log('Bubble chart data:', { itemsCount: items.length, sampleItem: items[0] });
       // Build salaries array (exclude per-shift)
-      const salaries = items.map(v => {
+      const salariesAll = items.map(v => {
         // Use monthly salary including per-shift vacancies if estimated monthly is provided
         if (v.salary_per_shift === true) {
           return (typeof v.salary_estimated_monthly === 'number') ? v.salary_estimated_monthly : null;
@@ -1081,7 +1081,7 @@ async def dashboard():
           if (st !== null) return st;
         }
         return null;
-      }).filter(x => typeof x === 'number' && x >= 10000).sort((a,b) => a-b);
+      }).filter(x => typeof x === 'number' && x >= 13000).sort((a,b) => a-b);
 
       // Percentile helper
       const percentile = (arr, p) => {
@@ -1093,6 +1093,41 @@ async def dashboard():
         const w = idx - lo;
         return arr[lo] * (1 - w) + arr[hi] * w;
       };
+
+      // Apply high outlier filtering (Tukey IQR). Fallback for tiny samples.
+      let salaries = salariesAll;
+      if (salariesAll.length >= 4) {
+        const q1 = percentile(salariesAll, 0.25);
+        const q3 = percentile(salariesAll, 0.75);
+        const iqr = q3 - q1;
+        if (iqr > 0) {
+          const highCut = q3 + 1.5 * iqr;
+          const filtered = salariesAll.filter(s => s <= highCut);
+          if (filtered.length >= Math.min(3, salariesAll.length)) {
+            salaries = filtered;
+          }
+        }
+      } else if (salariesAll.length >= 2) {
+        const medSmall = percentile(salariesAll, 0.50);
+        if (salariesAll[salariesAll.length - 1] > 2 * medSmall) {
+          salaries = salariesAll.slice(0, -1);
+        }
+      }
+
+      // Determine an upper salary threshold for bubble points to hide extreme single values
+      // Use the same Tukey IQR rule when possible; otherwise use a conservative 2x median cap
+      let salaryUpperCap = Number.POSITIVE_INFINITY;
+      if (salariesAll.length >= 4) {
+        const q1Cap = percentile(salariesAll, 0.25);
+        const q3Cap = percentile(salariesAll, 0.75);
+        const iqrCap = q3Cap - q1Cap;
+        if (iqrCap > 0) {
+          salaryUpperCap = q3Cap + 1.5 * iqrCap;
+        }
+      } else if (salariesAll.length >= 2) {
+        const medSmallCap = percentile(salariesAll, 0.50);
+        salaryUpperCap = 2 * medSmallCap;
+      }
 
       const p25 = percentile(salaries, 0.25);
       const p50 = percentile(salaries, 0.50);
@@ -1177,7 +1212,11 @@ async def dashboard():
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
 
-          if (monthly === null || rating === null || monthly < 10000) {
+          if (monthly === null || rating === null || monthly < 13000) {
+            return null;
+          }
+          // Hide extreme salary outliers from the bubble chart
+          if (monthly > salaryUpperCap) {
             return null;
           }
           return {

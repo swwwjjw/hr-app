@@ -9,33 +9,71 @@ except Exception:
 
 
 def salary_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
-    # Prefer already computed monthly averages if available, then fall back to API salary,
-    # then to estimated monthly derived from per-shift mentions.
+    # Prefer already computed monthly averages if available, then fall back to API salary.
+    # If vacancy is per-shift and has an estimated monthly, include that to avoid losing data.
     raw: List[Optional[float]] = []
     for v in vacancies:
-        # Skip per-shift flagged vacancies
         if v.get("salary_per_shift"):
+            est = v.get("salary_estimated_monthly")
+            raw.append(est if isinstance(est, (int, float)) else None)
             continue
         val = v.get("salary_avg")
         if val is None:
             val = normalize_salary(v.get("salary"))
-        # Do not use estimated per-shift monthly values in stats
         raw.append(val if isinstance(val, (int, float)) else None)
-    # Filter out invalid/likely per-shift small values (< 10 000₽)
-    MIN_VALID_MONTHLY = 10000.0
+    # Filter out invalid/likely per-shift small values (< 13 000₽)
+    MIN_VALID_MONTHLY = 13000.0
     salaries = [s for s in raw if s is not None and float(s) >= MIN_VALID_MONTHLY]
     if not salaries:
         return {"count": 0, "avg": None, "median": None, "min": None, "max": None}
     salaries.sort()
+
+    # Remove extreme high outliers so single huge values don't skew stats.
+    # Primary rule: Tukey IQR fence (Q3 + 1.5*IQR) when we have enough data.
+    # Fallback: if too few values for IQR, drop a single max if it is
+    # disproportionately larger than median.
+    def percentile(sorted_arr: List[float], p: float) -> float:
+        if not sorted_arr:
+            return float('nan')
+        idx = (len(sorted_arr) - 1) * p
+        lo = math.floor(idx)
+        hi = math.ceil(idx)
+        if lo == hi:
+            return float(sorted_arr[lo])
+        frac = idx - lo
+        return float(sorted_arr[lo]) * (1 - frac) + float(sorted_arr[hi]) * frac
+
     n = len(salaries)
-    avg = sum(salaries) / n
-    median = salaries[n // 2] if n % 2 == 1 else (salaries[n // 2 - 1] + salaries[n // 2]) / 2
+    filtered = salaries
+    if n >= 4:
+        q1 = percentile(salaries, 0.25)
+        q3 = percentile(salaries, 0.75)
+        iqr = q3 - q1
+        if iqr > 0:
+            high_cut = q3 + 1.5 * iqr
+            filtered = [s for s in salaries if s <= high_cut]
+            # Ensure we don't drop everything; keep at least 3 values if possible
+            if len(filtered) < 3 and n >= 3:
+                filtered = salaries[:-1] if n > 1 else salaries
+    else:
+        # For very small samples (n < 4), remove the max if it is a clear outlier
+        # relative to the median (more than 2x median).
+        med_small = salaries[n // 2] if n % 2 == 1 else (salaries[n // 2 - 1] + salaries[n // 2]) / 2
+        if n >= 2 and salaries[-1] > 2 * med_small:
+            filtered = salaries[:-1]
+
+    if not filtered:
+        filtered = salaries
+
+    n = len(filtered)
+    avg = sum(filtered) / n
+    median = filtered[n // 2] if n % 2 == 1 else (filtered[n // 2 - 1] + filtered[n // 2]) / 2
     return {
         "count": n,
         "avg": round(avg, 2),
         "median": round(median, 2),
-        "min": round(salaries[0], 2),
-        "max": round(salaries[-1], 2),
+        "min": round(filtered[0], 2),
+        "max": round(filtered[-1], 2),
     }
 
 
