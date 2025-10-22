@@ -595,6 +595,7 @@ async def dashboard():
               <option value="уборщик клининг">Уборщик</option>
     </select>
     <button id="apply">Найти</button>
+    <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
   <div class="card" id="marketCard" style="margin-top:24px; padding:20px;">
     <h3>Сравнение с рынком по заработной плате</h3>
@@ -757,6 +758,29 @@ async def dashboard():
       url.searchParams.delete('resume_ids');
       ids.forEach(id => url.searchParams.append('resume_ids', id));
       window.location.href = url.toString();
+    }
+
+    // Navigate to the React app's competitors tab (port 7000 by default)
+    function goToCompetitors() {
+      try {
+        const { query, area, pages, per_page } = getParams();
+        const protocol = window.location.protocol;
+        const host = window.location.hostname;
+        // Default to frontend served on port 80 (nginx)
+        const targetOrigin = `${protocol}//${host}`;
+        const url = new URL(targetOrigin + '/');
+        // Pass through current context and suggest the competitors tab
+        url.searchParams.set('query', query || '');
+        url.searchParams.set('area', area || '2');
+        if (pages != null) url.searchParams.set('pages', String(pages));
+        if (per_page != null) url.searchParams.set('per_page', String(per_page));
+        url.searchParams.set('tab', 'competitors');
+        window.location.href = url.toString();
+      } catch (e) {
+        // Fallback to root of port 7000
+        const fallback = `${window.location.protocol}//${window.location.hostname}/`;
+        window.location.href = fallback;
+      }
     }
 
     async function load() {
@@ -1417,6 +1441,8 @@ async def dashboard():
 
     document.getElementById('apply').addEventListener('click', applyFromControls);
     document.getElementById('applyResume').addEventListener('click', applyResumeFromControls);
+    const btnCompetitors = document.getElementById('toCompetitors');
+    if (btnCompetitors) btnCompetitors.addEventListener('click', goToCompetitors);
     
     // Handle preset dropdown with defensive mapping
     document.getElementById('presets').addEventListener('change', (e) => {
