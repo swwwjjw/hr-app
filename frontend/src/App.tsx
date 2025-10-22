@@ -7,9 +7,9 @@ import WordCloud from 'wordcloud';
 
 export const App: React.FC = () => {
   const [query, setQuery] = useState('контролер кпп');
-  const [area] = useState<number>(2);
-  const [pages] = useState<number>(2);
-  const [perPage] = useState<number>(50);
+  const [area, setArea] = useState<number>(2);
+  const [pages, setPages] = useState<number>(2);
+  const [perPage, setPerPage] = useState<number>(50);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
   const [resumeStats, setResumeStats] = useState<any>(null);
@@ -19,6 +19,7 @@ export const App: React.FC = () => {
   const [competitorLoading, setCompetitorLoading] = useState(false);
   const [competitorItems, setCompetitorItems] = useState<any[]>([]);
   const [selectedEmployer, setSelectedEmployer] = useState<string>('');
+  const [competitorReload, setCompetitorReload] = useState(0);
 
   const presets = useMemo(() => [
     { value: 'контролер кпп', label: 'Инспекторы-контролёры' },
@@ -27,12 +28,16 @@ export const App: React.FC = () => {
     { value: 'гбр, охрана', label: 'Инспектор ГБР' }
   ], []);
 
-  const load = async () => {
+  const load = async (overrides?: { query?: string; area?: number; pages?: number; per_page?: number }) => {
     setLoading(true);
     try {
+      const qv = overrides?.query ?? query;
+      const av = overrides?.area ?? area;
+      const pg = overrides?.pages ?? pages;
+      const pp = overrides?.per_page ?? perPage;
       const [analyze, resumes] = await Promise.all([
-        fetchAnalyze({ query, area, pages, per_page: perPage }),
-        fetchResumeStats({ vacancy_query: query, area, pages, per_page: perPage })
+        fetchAnalyze({ query: qv, area: av, pages: pg, per_page: pp }),
+        fetchResumeStats({ vacancy_query: qv, area: av, pages: pg, per_page: pp })
       ]);
       setData(analyze);
       setResumeStats(resumes);
@@ -42,20 +47,52 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    // If no explicit query in URL, load with defaults on mount
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.get('query')) {
+      load();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Respect query parameter tab=competitors to open the competitors tab on load
+  // Initialize from URL: tab, query, area, pages, per_page
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const tab = sp.get('tab');
-    if (tab === 'competitors') {
-      setActiveTab('competitors');
+    if (tab === 'competitors') setActiveTab('competitors');
+
+    const overrides: { query?: string; area?: number; pages?: number; per_page?: number } = {};
+    const q = sp.get('query');
+    if (q) {
+      setQuery(q);
+      overrides.query = q;
     }
+    const a = sp.get('area');
+    if (a != null && a !== '' && !Number.isNaN(Number(a))) {
+      const ai = Number(a);
+      setArea(ai);
+      overrides.area = ai;
+    }
+    const pg = sp.get('pages');
+    if (pg != null && pg !== '' && !Number.isNaN(Number(pg))) {
+      const pgi = Number(pg);
+      setPages(pgi);
+      overrides.pages = pgi;
+    }
+    const pp = sp.get('per_page');
+    if (pp != null && pp !== '' && !Number.isNaN(Number(pp))) {
+      const ppi = Number(pp);
+      setPerPage(ppi);
+      overrides.per_page = ppi;
+    }
+    if (Object.keys(overrides).length > 0) {
+      // Use overrides immediately to avoid racing state updates
+      load(overrides);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load competitor items when switching to competitors tab or when query changes
+  // Load competitor items when switching to competitors tab or when filters change
   useEffect(() => {
     const loadCompetitors = async () => {
       if (activeTab !== 'competitors') return;
@@ -89,7 +126,7 @@ export const App: React.FC = () => {
     };
     loadCompetitors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, query]);
+  }, [activeTab, query, area, pages, perPage, competitorReload]);
 
   const competitorOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -102,6 +139,15 @@ export const App: React.FC = () => {
       .sort((a, b) => b[1] - a[1])
       .map(([name]) => name);
   }, [competitorItems]);
+
+  // Ensure selected employer remains valid when options change
+  useEffect(() => {
+    if (activeTab !== 'competitors') return;
+    if (selectedEmployer && !competitorOptions.includes(selectedEmployer)) {
+      setSelectedEmployer(competitorOptions[0] || '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [competitorOptions]);
 
   const competitorHourly = useMemo(() => {
     if (!selectedEmployer) return {} as any;
@@ -205,7 +251,7 @@ export const App: React.FC = () => {
                 <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
               ))}
             </select>
-            <button onClick={() => setActiveTab('competitors')} disabled={competitorLoading}>Обновить</button>
+            <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
           </div>
           <div className="meta">{selectedEmployer || 'Компания не выбрана'}</div>
           <HourlyStatsCard hourly={competitorHourly} />
