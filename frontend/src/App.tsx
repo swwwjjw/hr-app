@@ -13,7 +13,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
   const [resumeStats, setResumeStats] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'vacancies' | 'competitors'>('vacancies');
+  const [activeTab, setActiveTab] = useState<'vacancies' | 'competitors'>('competitors');
 
   // Competitor tab state
   const [competitorLoading, setCompetitorLoading] = useState(false);
@@ -47,10 +47,12 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // If no explicit query in URL, load with defaults on mount
+    // If no explicit query in URL, load with defaults on mount (vacancies tab only)
     const sp = new URLSearchParams(window.location.search);
     if (!sp.get('query')) {
-      load();
+      if (activeTab === 'vacancies') {
+        load();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -194,30 +196,24 @@ export const App: React.FC = () => {
 
       {/* Tabs */}
       <div className="tabs" style={{ marginBottom: 16 }}>
-        <button className={activeTab === 'vacancies' ? 'tab active' : 'tab'} onClick={() => setActiveTab('vacancies')}>Вакансии</button>
         <button className={activeTab === 'competitors' ? 'tab active' : 'tab'} onClick={() => setActiveTab('competitors')}>Конкуренты</button>
       </div>
 
-      {/* Shared controls for query selection */}
-      <div className="controls">
-        <select value={query} onChange={(e) => setQuery(e.target.value)}>
-          <option value="">Выберите вакансию</option>
-          {presets.map(p => (
-            <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
-          ))}
-        </select>
-        <button onClick={load} disabled={loading}>Найти</button>
-        {activeTab === 'vacancies' && (
+      {/* Shared controls for query selection (only for vacancies tab) */}
+      {activeTab === 'vacancies' && (
+        <div className="controls">
+          <select value={query} onChange={(e) => setQuery(e.target.value)}>
+            <option value="">Выберите вакансию</option>
+            {presets.map(p => (
+              <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
+            ))}
+          </select>
+          <button onClick={load} disabled={loading}>Найти</button>
           <button onClick={() => setActiveTab('competitors')} title="Перейти к вкладке конкурентов">
             К конкурентам
           </button>
-        )}
-        {activeTab === 'competitors' && (
-          <button onClick={() => setActiveTab('vacancies')} title="Перейти к вкладке вакансий">
-            К вакансиям
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {activeTab === 'vacancies' && data && (
         <div className="row">
