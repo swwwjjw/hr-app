@@ -18,7 +18,6 @@ export const App: React.FC = () => {
   // Competitor tab state
   const [competitorLoading, setCompetitorLoading] = useState(false);
   const [competitorItems, setCompetitorItems] = useState<any[]>([]);
-  const [selectedEmployer, setSelectedEmployer] = useState<string>('');
   const [competitorReload, setCompetitorReload] = useState(0);
 
   const presets = useMemo(() => [
@@ -108,18 +107,6 @@ export const App: React.FC = () => {
         });
         const items = Array.isArray(res?.items) ? res.items : [];
         setCompetitorItems(items);
-        // Set default employer if not chosen yet
-        if (!selectedEmployer) {
-          // choose the most frequent employer
-          const counts = new Map<string, number>();
-          for (const it of items) {
-            const name = (it?.employer_name || '').toString().trim();
-            if (!name) continue;
-            counts.set(name, (counts.get(name) || 0) + 1);
-          }
-          const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-          setSelectedEmployer(top);
-        }
       } finally {
         setCompetitorLoading(false);
       }
@@ -128,35 +115,17 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, query, area, pages, perPage, competitorReload]);
 
-  const competitorOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    (competitorItems || []).forEach((it) => {
-      const name = (it?.employer_name || '').toString().trim();
-      if (!name) return;
-      counts.set(name, (counts.get(name) || 0) + 1);
-    });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([name]) => name);
-  }, [competitorItems]);
-
-  // Ensure selected employer remains valid when options change
-  useEffect(() => {
-    if (activeTab !== 'competitors') return;
-    if (selectedEmployer && !competitorOptions.includes(selectedEmployer)) {
-      setSelectedEmployer(competitorOptions[0] || '');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [competitorOptions]);
+  // Region options for dropdown (basic set)
+  const regionOptions = useMemo(() => [
+    { value: 1, label: 'Москва' },
+    { value: 2, label: 'Санкт-Петербург' },
+  ], []);
 
   const competitorHourly = useMemo(() => {
-    if (!selectedEmployer) return {} as any;
-    // Build monthly salaries for the selected employer, excluding per-shift and requiring schedule
+    // Aggregate hourly stats across all vacancies in the selected region
     const HOURS_PER_MONTH = 164.0;
     const monthly: number[] = [];
     for (const v of competitorItems || []) {
-      const employerName = (v?.employer_name || '').toString();
-      if (!employerName || employerName !== selectedEmployer) continue;
       if (v?.salary_per_shift === true) continue; // exclude per-shift
       if (!v?.schedule) continue; // need schedule to treat as hourly-based role
       let m: number | null = null;
@@ -185,7 +154,7 @@ export const App: React.FC = () => {
       max: hourly[hourly.length - 1],
       count: hourly.length,
     } as any;
-  }, [competitorItems, selectedEmployer]);
+  }, [competitorItems]);
 
   return (
     <div className="container">
@@ -271,17 +240,24 @@ export const App: React.FC = () => {
       {/* Competitors Tab */}
       {activeTab === 'competitors' && (
         <div className="card">
-          <h3>ЧТС по конкурентам</h3>
+          <h3>ЧТС по регионам</h3>
           <div className="controls" style={{ marginTop: 8 }}>
-            <select value={selectedEmployer} onChange={(e) => setSelectedEmployer(e.target.value)}>
-              <option value="">Выберите компанию</option>
-              {competitorOptions.map((name) => (
-                <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
+            <select
+              value={area ?? ''}
+              onChange={(e) => {
+                const newArea = Number(e.target.value);
+                setArea(newArea);
+                setCompetitorReload((x) => x + 1);
+              }}
+            >
+              <option value="">Выберите регион</option>
+              {regionOptions.map((r) => (
+                <option key={r.value} value={r.value} style={{ color: '#000000ff' }}>{r.label}</option>
               ))}
             </select>
             <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
           </div>
-          <div className="meta">{selectedEmployer || 'Компания не выбрана'}</div>
+          <div className="meta">{regionOptions.find(r => r.value === area)?.label || 'Регион не выбран'}</div>
           <HourlyStatsCard hourly={competitorHourly} />
         </div>
       )}
