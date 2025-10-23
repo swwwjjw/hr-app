@@ -160,7 +160,7 @@
       const query = sp.get('query') || 'контролер кпп';
       const area = sp.get('area') || '2';
       const pages = sp.get('pages');
-      const per_page = sp.get('per_page') || '50';
+      const per_page = sp.get('per_page') || '100';
       return { query, area, pages, per_page };
     }
 
@@ -223,7 +223,7 @@
         },
       },
       {
-        label: 'Авиакомпания Россия',
+        label: 'АО Авиакомпания Россия',
         match: (raw) => {
           const n = normalizeName(raw);
           return n.includes('авиакомпан') && n.includes('россия');
