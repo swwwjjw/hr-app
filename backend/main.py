@@ -183,7 +183,8 @@ async def fetch(
     simplified: bool = Query(False),
     employer_mark: bool = Query(False),
     include_description: bool = Query(False),
-    fetch_all: bool = Query(True, description="If true, ignore 'pages' and fetch all available pages")
+    fetch_all: bool = Query(True, description="If true, ignore 'pages' and fetch all available pages"),
+    exclude_vakhta: bool = Query(True, description="Exclude 'Вахтовый метод' vacancies when true")
 ):
     # Generate cache key
     cache_key = get_cache_key(query, area, pages, per_page, simplified=simplified, employer_mark=employer_mark, include_description=include_description)
@@ -200,13 +201,16 @@ async def fetch(
     if include_description:
         await enrich_with_descriptions(items)
     
-    # Filter out vacancies with "Вахтовый метод" schedule from raw items
-    filtered_items = []
-    for item in items:
-        schedule_obj = item.get("schedule") or {}
-        schedule_name = schedule_obj.get("name") if schedule_obj else None
-        if schedule_name != "Вахтовый метод":
-              filtered_items.append(item)
+    # Optionally filter out vacancies with "Вахтовый метод" schedule
+    if exclude_vakhta:
+        filtered_items = []
+        for item in items:
+            schedule_obj = item.get("schedule") or {}
+            schedule_name = schedule_obj.get("name") if schedule_obj else None
+            if schedule_name != "Вахтовый метод":
+                filtered_items.append(item)
+    else:
+        filtered_items = items
     
     if simplified:
         parsed = await parse_vacancies(filtered_items, with_employer_mark=employer_mark)
