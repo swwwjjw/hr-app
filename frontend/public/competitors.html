@@ -173,7 +173,7 @@
     function setContextMeta({ query, area, pages, per_page }) {
       const meta = document.getElementById('contextMeta');
       const parts = [];
-      if (query) parts.push(`Запрос: “${query}”`);
+      parts.push('Агрегация: все вакансии региона');
       if (area) parts.push(`Регион: ${regionLabel(area)}`);
       if (per_page) parts.push(`На странице: ${per_page}`);
       if (pages) parts.push(`Страниц: ${pages}`);
@@ -226,7 +226,8 @@
 
     async function fetchCompetitors({ query, area, pages, per_page }) {
       const url = new URL(window.location.origin + '/api/fetch');
-      url.searchParams.set('query', query);
+      // Intentionally ignore the search query to aggregate by area
+      url.searchParams.set('query', '');
       if (area != null) url.searchParams.set('area', String(area));
       if (pages != null && pages !== '') url.searchParams.set('pages', String(pages));
       if (per_page != null) url.searchParams.set('per_page', String(per_page));
