@@ -192,10 +192,7 @@ export const App: React.FC = () => {
       <h1>Аналитика вакансий</h1>
       <div className="meta">📍 Санкт-Петербург</div>
 
-      {/* Tabs */}
-      <div className="tabs" style={{ marginBottom: 16 }}>
-        <button className={activeTab === 'competitors' ? 'tab active' : 'tab'} onClick={() => setActiveTab('competitors')}>Конкуренты</button>
-      </div>
+      {/* Tabs removed: 'Конкуренты' button deleted as requested */}
 
       {/* Shared controls for query selection */}
       <div className="controls">
