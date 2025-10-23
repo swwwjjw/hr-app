@@ -194,43 +194,45 @@ export const App: React.FC = () => {
 
       {/* Tabs */}
       <div className="tabs" style={{ marginBottom: 16 }}>
-        <button className={activeTab === 'competitors' ? 'tab active' : 'tab'} onClick={() => setActiveTab('competitors')}>Конкуренты</button>
+        <button
+          className={activeTab === 'vacancies' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('vacancies')}
+        >
+          Вакансии
+        </button>
+        <button
+          className={activeTab === 'competitors' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('competitors')}
+        >
+          Конкуренты
+        </button>
       </div>
 
-      {/* Shared controls for query selection */}
+      {/* Shared controls for current tab */}
       <div className="controls">
         {activeTab === 'vacancies' && (
           <>
             <select value={query} onChange={(e) => setQuery(e.target.value)}>
               <option value="">Выберите вакансию</option>
-              {presets.map(p => (
-                <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
+              {presets.map((p) => (
+                <option key={p.value} value={p.value} style={{ color: '#000000ff' }}>
+                  {p.label}
+                </option>
               ))}
             </select>
             <button onClick={load} disabled={loading}>Найти</button>
           </>
         )}
-        {activeTab === 'vacancies' && (
-          <button onClick={() => setActiveTab('competitors')} title="Перейти к вкладке конкурентов">
-            К конкурентам
-          </button>
-        )}
         {activeTab === 'competitors' && (
-          <button
-            onClick={() => {
-              const { protocol, hostname } = window.location;
-              const url = new URL(`${protocol}//${hostname}:8000/dashboard`);
-              // Preserve current filters when returning to backend dashboard
-              url.searchParams.set('query', (query || '').toString());
-              if (area != null) url.searchParams.set('area', String(area));
-              if (pages != null) url.searchParams.set('pages', String(pages));
-              if (perPage != null) url.searchParams.set('per_page', String(perPage));
-              window.location.href = url.toString();
-            }}
-            title="Вернуться на порт 8000"
-          >
-            К вакансиям
-          </button>
+          <>
+            <select value={selectedEmployer} onChange={(e) => setSelectedEmployer(e.target.value)}>
+              <option value="">Выберите компанию</option>
+              {competitorOptions.map((name) => (
+                <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
+              ))}
+            </select>
+            <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
+          </>
         )}
       </div>
 
@@ -264,15 +266,6 @@ export const App: React.FC = () => {
       {activeTab === 'competitors' && (
         <div className="card">
           <h3>ЧТС по конкурентам</h3>
-          <div className="controls" style={{ marginTop: 8 }}>
-            <select value={selectedEmployer} onChange={(e) => setSelectedEmployer(e.target.value)}>
-              <option value="">Выберите компанию</option>
-              {competitorOptions.map((name) => (
-                <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
-              ))}
-            </select>
-            <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
-          </div>
           <div className="meta">{selectedEmployer || 'Компания не выбрана'}</div>
           <HourlyStatsCard hourly={competitorHourly} />
         </div>
