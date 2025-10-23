@@ -136,7 +136,6 @@
         <select id="regions">
           <option value="">Загрузка...</option>
         </select>
-        <button id="reloadBtn">Обновить</button>
       </div>
       <div class="meta" id="regionMeta">Регион не выбран</div>
       <div id="hourlyCard">
@@ -302,7 +301,7 @@
         }
       }
 
-      document.getElementById('reloadBtn').addEventListener('click', loadAndRender);
+      // Auto-reload on init and on region change; manual reload button removed
       document.getElementById('regions').addEventListener('change', (e) => {
         selectedArea = e.target.value;
         ctx.area = selectedArea;

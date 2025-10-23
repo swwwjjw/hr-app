@@ -173,7 +173,6 @@ export const App: React.FC = () => {
                 <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
               ))}
             </select>
-            <button onClick={load} disabled={loading}>Найти</button>
           </>
         )}
         {activeTab === 'vacancies' && (
@@ -255,7 +254,6 @@ export const App: React.FC = () => {
                 <option key={r.value} value={r.value} style={{ color: '#000000ff' }}>{r.label}</option>
               ))}
             </select>
-            <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
           </div>
           <div className="meta">{regionOptions.find(r => r.value === area)?.label || 'Регион не выбран'}</div>
           <HourlyStatsCard hourly={competitorHourly} />
