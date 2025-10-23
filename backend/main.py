@@ -585,7 +585,7 @@ async def dashboard():
     <select id="presets">
       <option value="">Выберите вакансию</option>
       <option value="контролер кпп">Инспекторы-контролёры</option>
-      <option value="инспектор досмотр">Инспекторы по досмотру</option>
+      <option value="безопасность досмотр">Инспекторы по досмотру</option>
       <!-- <option value="инспектор перрон">Инспекторы перронного контроля</option> -->
       <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
       <option value="врач терапевт">Врач-терапевт</option>
@@ -594,11 +594,14 @@ async def dashboard():
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
-    <!-- 'Найти' button removed -->
+    <button id="searchBtn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8); color:white; border:none; padding:8px 16px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s; margin-left:8px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Найти</button>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
   <div class="card" id="marketCard" style="margin-top:24px; padding:20px;">
-    <h3>Сравнение с рынком по заработной плате</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0;">Сравнение с рынком по заработной плате</h3>
+      <button id="teamProjectBtn" style="background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; padding:8px 16px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">С проектом "Мы команда"</button>
+    </div>
     <div style="display:flex; justify-content:space-between; font-size:12px; color:#cbd5e1; margin-bottom:12px;">
       <div style="color:#94a3b8;">Ниже рынка</div>
       <div style="color:#3b82f6;">В рынке</div>
@@ -716,7 +719,7 @@ async def dashboard():
       // Map queries to preset values (order matters - more specific first)
       const queryToPreset = {
         'контролер кпп': 'контролер кпп',
-        'инспектор досмотр': 'инспектор досмотр', 
+        'безопасность досмотр': 'безопасность досмотр', 
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
         'грузчик склад': 'грузчик склад',
@@ -994,7 +997,29 @@ async def dashboard():
           return null;
         })
         .filter(x => typeof x === 'number');
-      const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) : null;
+      
+      // Store original salaries for team project button functionality
+      window.originalSalaries = [...salaries];
+      window.currentSalaries = [...salaries];
+      
+      // Add additional salary amounts to Pulkovo salaries based on query and button state
+      let additionalPulkovoSalary = 0;
+      const teamProjectActive = window.teamProjectActive || false;
+      
+      if (teamProjectActive) {
+        const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
+        const normalizedQuery = currentQuery.toLowerCase().trim();
+        
+        if (normalizedQuery.includes('контролер кпп')) {
+          additionalPulkovoSalary = 16452;
+        } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
+          additionalPulkovoSalary = 84629;
+        } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
+          additionalPulkovoSalary = 76798;
+        }
+      }
+      
+      const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
 
       // Render market scale bands and ticks if data exists
       const scaleEl = document.getElementById('marketScale');
@@ -1054,6 +1079,21 @@ async def dashboard():
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
 
+          // Add additional salary to Pulkovo vacancies only when button is active
+          if (isPulkovo && monthly !== null && window.teamProjectActive) {
+            const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
+            const normalizedQuery = currentQuery.toLowerCase().trim();
+            
+            if (normalizedQuery.includes('контролер кпп')) {
+              monthly += 16452;
+            } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
+              monthly += 84629;
+            } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
+              monthly += 76798;
+            }
+          }
+
+
           if (monthly === null || rating === null || monthly < 13000) {
             return null;
           }
@@ -1079,6 +1119,51 @@ async def dashboard():
           };
         })
         .filter(p => p !== null);
+      
+      // Add specific vacancies for специалист сбовс
+      if (query && (query.toLowerCase().includes('специалист сбовс') || query.toLowerCase().includes('уборщик клининг'))) {
+        // Add Авиакомпания Победа vacancy
+        const pobedaVacancy = {
+          x: 69000, // Average of 64,000-74,000 range
+          y: 3.4, // Employer rating for Авиакомпания Победа
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Специалист по уборке ВС',
+          employer: 'Авиакомпания Победа',
+          isPulkovo: false,
+          isPobeda: true
+        };
+        points.push(pobedaVacancy);
+        console.log('Added Pobeda vacancy:', pobedaVacancy);
+        
+        // Add Теремок vacancy
+        const teremokVacancy = {
+          x: 87500, // Average of 80,000-95,000 range
+          y: 4.2, // High employer rating for Теремок
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Уборщица/Уборщик в ресторан',
+          employer: 'Теремок - Русские Блины',
+          isPulkovo: false,
+          isTeremok: true
+        };
+        points.push(teremokVacancy);
+        console.log('Added Teremok vacancy:', teremokVacancy);
+      }
+      
+      // Add specific vacancy for водитель категория D
+      if (query && query.toLowerCase().includes('водитель категория d')) {
+        const ozonVacancy = {
+          x: 176000, // Average of 144,000-208,000 range
+          y: 4.0, // High employer rating for Ozon
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Водитель-курьер на автомобиле компании',
+          employer: 'Озон',
+          isPulkovo: false,
+          isOzonHighlight: true
+        };
+        points.push(ozonVacancy);
+        console.log('Added Ozon vacancy:', ozonVacancy);
+      }
+      
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
       // Create horizontal bar chart for candidate requirements
       const barChartContainer = document.getElementById('barChartContainer');
@@ -1183,6 +1268,9 @@ async def dashboard():
       const ozonPoints = points.filter(p => p.employer && p.employer.includes('Ozon'));
       const teremokPoints = points.filter(p => p.employer && p.employer.includes('Теремок'));
       const wildberriesPoints = points.filter(p => p.employer && p.employer.includes('WILDBERRIES'));
+      const pobedaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Победа'));
+      const teremokHighlightPoints = points.filter(p => p.employer && p.employer.includes('Теремок - Русские Блины'));
+      const ozonHighlightPoints = points.filter(p => p.employer && p.employer.includes('Озон') && p.isOzonHighlight);
       const otherPoints = points.filter(p => 
         !p.isPulkovo && 
         !(p.employer && p.employer.includes('Авиакомпания Россия')) &&
@@ -1190,7 +1278,8 @@ async def dashboard():
         !(p.employer && p.employer.includes('АО Зенит-Арена')) &&
         !(p.employer && p.employer.includes('Ozon')) &&
         !(p.employer && p.employer.includes('Теремок')) &&
-        !(p.employer && p.employer.includes('WILDBERRIES'))
+        !(p.employer && p.employer.includes('WILDBERRIES')) &&
+        !(p.employer && p.employer.includes('Авиакомпания Победа'))
       );
       
       console.log('Chart datasets:', {
@@ -1202,6 +1291,9 @@ async def dashboard():
         ozonCount: ozonPoints.length,
         teremokCount: teremokPoints.length,
         wildberriesCount: wildberriesPoints.length,
+        pobedaCount: pobedaPoints.length,
+        teremokHighlightCount: teremokHighlightPoints.length,
+        ozonHighlightCount: ozonHighlightPoints.length,
         otherCount: otherPoints.length,
         rossiyaSample: rossiyaPoints.slice(0, 2)
       });
@@ -1256,11 +1348,11 @@ async def dashboard():
             {
               label: 'Петербургский Метрополитен',
               data: metroPoints,
-              backgroundColor: 'rgba(6, 57, 112, 0.5)',
-              borderColor: 'rgba(6, 57, 112, 0.9)',
+              backgroundColor: 'rgba(173, 216, 230, 0.7)',
+              borderColor: 'rgba(173, 216, 230, 0.9)',
               borderWidth: 2,
-              hoverBackgroundColor: 'rgba(6, 57, 112, 0.8)',
-              hoverBorderColor: 'rgba(6, 57, 112, 1)',
+              hoverBackgroundColor: 'rgba(173, 216, 230, 0.8)',
+              hoverBorderColor: 'rgba(173, 216, 230, 1)',
               hoverBorderWidth: 3
             },
             {
@@ -1284,16 +1376,6 @@ async def dashboard():
               hoverBorderWidth: 3
             },
             {
-              label: 'Теремок',
-              data: teremokPoints,
-              backgroundColor: 'rgba(255, 99, 132, 0.5)',
-              borderColor: 'rgba(255, 99, 132, 0.9)',
-              borderWidth: 2,
-              hoverBackgroundColor: 'rgba(255, 99, 132, 0.8)',
-              hoverBorderColor: 'rgba(255, 99, 132, 1)',
-              hoverBorderWidth: 3
-            },
-            {
               label: 'WILDBERRIES',
               data: wildberriesPoints,
               backgroundColor: 'rgba(147, 51, 234, 0.5)',
@@ -1302,6 +1384,36 @@ async def dashboard():
               hoverBackgroundColor: 'rgba(147, 51, 234, 0.8)',
               hoverBorderColor: 'rgba(147, 51, 234, 1)',
               hoverBorderWidth: 3
+            },
+            {
+              label: 'Авиакомпания Победа',
+              data: pobedaPoints,
+              backgroundColor: 'rgba(220, 38, 38, 0.6)',
+              borderColor: 'rgba(220, 38, 38, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(220, 38, 38, 0.8)',
+              hoverBorderColor: 'rgba(220, 38, 38, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Теремок',
+              data: teremokHighlightPoints,
+              backgroundColor: 'rgba(255, 193, 7, 0.6)',
+              borderColor: 'rgba(255, 193, 7, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 193, 7, 0.8)',
+              hoverBorderColor: 'rgba(255, 193, 7, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Озон',
+              data: ozonHighlightPoints,
+              backgroundColor: 'rgba(255, 20, 147, 0.6)',
+              borderColor: 'rgba(255, 20, 147, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 20, 147, 0.8)',
+              hoverBorderColor: 'rgba(255, 20, 147, 1)',
+              hoverBorderWidth: 4
             }
           ]
         },
@@ -1517,7 +1629,14 @@ async def dashboard():
 
     }
 
-    // 'Найти' button removed; no click handler attached
+    // 'Найти' button functionality
+    document.getElementById('searchBtn').addEventListener('click', function() {
+      const query = document.getElementById('query').value;
+      if (query.trim()) {
+        window.location.href = `/dashboard?query=${encodeURIComponent(query)}&area=2`;
+      }
+    });
+    
     document.getElementById('applyResume').addEventListener('click', applyResumeFromControls);
     const btnCompetitors = document.getElementById('toCompetitors');
     if (btnCompetitors) btnCompetitors.addEventListener('click', goToCompetitors);
@@ -1554,6 +1673,29 @@ async def dashboard():
       
       // Use salaries from API or generate mock data
       let histogramSalaries = salaries.length > 0 ? salaries : [];
+      
+      // Add additional salary to Pulkovo salaries for histogram only when button is active
+      let additionalPulkovoSalary = 0;
+      const teamProjectActive = window.teamProjectActive || false;
+      
+      if (teamProjectActive) {
+        const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
+        const normalizedQuery = currentQuery.toLowerCase().trim();
+        
+        if (normalizedQuery.includes('контролер кпп')) {
+          additionalPulkovoSalary = 16452;
+        } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
+          additionalPulkovoSalary = 84629;
+        } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
+          additionalPulkovoSalary = 76798;
+        }
+      }
+      
+      // Add additional salary to histogram data if there are Pulkovo vacancies and button is active
+      if (additionalPulkovoSalary > 0 && histogramSalaries.length > 0) {
+        histogramSalaries.push(additionalPulkovoSalary);
+      }
+      
       if (histogramSalaries.length === 0 && salaryStats && salaryStats.median) {
         // Generate mock data based on stats
         const avg = salaryStats.avg || 131234;
@@ -1800,6 +1942,51 @@ async def dashboard():
           }
         }
       });
+    }
+    
+    
+    
+    // Team project button functionality
+    function initTeamProjectButton() {
+      const teamProjectBtn = document.getElementById('teamProjectBtn');
+      if (!teamProjectBtn) {
+        console.warn('Team project button not found');
+        return;
+      }
+      
+      let teamProjectActive = window.teamProjectActive || false;
+      
+      // Restore button state on page load
+      if (teamProjectActive) {
+        teamProjectBtn.style.background = 'linear-gradient(135deg, #059669, #047857)';
+        teamProjectBtn.textContent = '✓ С проектом "Мы команда"';
+      }
+      
+      teamProjectBtn.addEventListener('click', function() {
+        console.log('Team project button clicked!');
+        teamProjectActive = !teamProjectActive;
+        window.teamProjectActive = teamProjectActive; // Set global state
+        
+        if (teamProjectActive) {
+          teamProjectBtn.style.background = 'linear-gradient(135deg, #059669, #047857)';
+          teamProjectBtn.textContent = '✓ С проектом "Мы команда"';
+          console.log('Button activated - adding additional salary');
+        } else {
+          teamProjectBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          teamProjectBtn.textContent = 'С проектом "Мы команда"';
+          console.log('Button deactivated - using base salary');
+        }
+        
+        // Reload the page to refresh all visualizations with new state
+        window.location.reload();
+      });
+    }
+    
+    // Initialize button when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initTeamProjectButton);
+    } else {
+      initTeamProjectButton();
     }
     
     load();
