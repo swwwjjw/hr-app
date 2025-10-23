@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ЧТС по конкурентам</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      min-height: 100vh;
+      color: #f1f5f9;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .card {
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      border-color: rgba(59, 130, 246, 0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 2rem;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+    }
+    h3 {
+      color: #80b9ff;
+      border-bottom: 2px solid rgba(128, 185, 255, 0.3);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+    .meta {
+      color: #cbd5e1;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+    .controls {
+      margin-bottom: 16px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    select, button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    button {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      border: none;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    button.secondary {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: #e2e8f0;
+    }
+    .grid4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 12px;
+    }
+    @media (max-width: 900px) { .grid4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .miniCard {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    .miniCard:hover { border-color: rgba(59, 130, 246, 0.5); background: rgba(255, 255, 255, 0.08); }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ЧТС по конкурентам</h1>
+    <div class="meta" id="contextMeta">—</div>
+
+    <div class="controls">
+      <button id="backBtn" class="secondary" title="Вернуться к вакансиям">К вакансиям</button>
+    </div>
+
+    <div class="card">
+      <h3>Выбор компании</h3>
+      <div class="controls">
+        <select id="employers">
+          <option value="">Загрузка...</option>
+        </select>
+        <button id="reloadBtn">Обновить</button>
+      </div>
+      <div class="meta" id="employerMeta">Компания не выбрана</div>
+      <div id="hourlyCard">
+        <div class="grid4">
+          <div class="miniCard"><div>Мин. ЧТС</div><b id="hMin">—</b></div>
+          <div class="miniCard"><div>Медиана ЧТС</div><b id="hMed">—</b></div>
+          <div class="miniCard"><div>Средняя ЧТС</div><b id="hAvg">—</b></div>
+          <div class="miniCard"><div>Макс. ЧТС</div><b id="hMax">—</b></div>
+        </div>
+        <div class="meta" id="hourlyMeta">Недостаточно данных</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getParams() {
+      const sp = new URLSearchParams(window.location.search);
+      const query = sp.get('query') || 'контролер кпп';
+      const area = sp.get('area') || '2';
+      const pages = sp.get('pages');
+      const per_page = sp.get('per_page') || '50';
+      return { query, area, pages, per_page };
+    }
+
+    function setContextMeta({ query, area, pages, per_page }) {
+      const meta = document.getElementById('contextMeta');
+      const parts = [];
+      if (query) parts.push(`Запрос: “${query}”`);
+      if (area) parts.push(`Регион: ${area}`);
+      if (per_page) parts.push(`На странице: ${per_page}`);
+      if (pages) parts.push(`Страниц: ${pages}`);
+      meta.textContent = parts.join(' · ');
+    }
+
+    function fmtHourly(v) {
+      if (typeof v !== 'number' || !isFinite(v)) return '—';
+      return Math.round(v).toLocaleString('ru-RU') + ' ₽/ч';
+    }
+
+    function pluralizeVacancies(n) {
+      if (typeof n !== 'number') return 'вакансиях';
+      const mod10 = n % 10, mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return 'вакансии';
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'вакансии';
+      return 'вакансиях';
+    }
+
+    function computeEmployerOptions(items) {
+      const counts = new Map();
+      for (const it of items || []) {
+        const name = (it?.employer_name || '').toString().trim();
+        if (!name) continue;
+        counts.set(name, (counts.get(name) || 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name]) => name);
+    }
+
+    function computeHourlyStats(items, selectedEmployer) {
+      if (!selectedEmployer) return { count: 0 };
+      const HOURS_PER_MONTH = 164.0;
+      const monthly = [];
+      for (const v of items || []) {
+        const employerName = (v?.employer_name || '').toString();
+        if (!employerName || employerName !== selectedEmployer) continue;
+        if (v?.salary_per_shift === true) continue; // exclude per-shift
+        if (!v?.schedule) continue; // require schedule
+        let m = null;
+        if (typeof v?.salary_avg === 'number') {
+          m = v.salary_avg;
+        } else if (v?.salary && typeof v.salary === 'object') {
+          const sf = typeof v.salary.from === 'number' ? v.salary.from : null;
+          const st = typeof v.salary.to === 'number' ? v.salary.to : null;
+          if (sf !== null && st !== null) m = (sf + st) / 2;
+          else if (sf !== null) m = sf;
+          else if (st !== null) m = st;
+        }
+        if (m !== null && m >= 10000) monthly.push(m);
+      }
+      if (!monthly.length) return { count: 0 };
+      const hourly = monthly.map(m => m / HOURS_PER_MONTH).sort((a,b) => a-b);
+      const n = hourly.length;
+      const median = n % 2 === 1 ? hourly[(n - 1) / 2] : (hourly[n / 2 - 1] + hourly[n / 2]) / 2;
+      return {
+        min: hourly[0],
+        median,
+        avg: hourly.reduce((a,b) => a + b, 0) / n,
+        max: hourly[n - 1],
+        count: n,
+      };
+    }
+
+    async function fetchCompetitors({ query, area, pages, per_page }) {
+      const url = new URL(window.location.origin + '/api/fetch');
+      url.searchParams.set('query', query);
+      if (area != null) url.searchParams.set('area', String(area));
+      if (pages != null && pages !== '') url.searchParams.set('pages', String(pages));
+      if (per_page != null) url.searchParams.set('per_page', String(per_page));
+      url.searchParams.set('simplified', 'true');
+      url.searchParams.set('employer_mark', 'true');
+      url.searchParams.set('fetch_all', 'true');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to load data');
+      const data = await res.json();
+      return Array.isArray(data?.items) ? data.items : [];
+    }
+
+    function renderEmployers(options, selected) {
+      const sel = document.getElementById('employers');
+      sel.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Выберите компанию';
+      sel.appendChild(placeholder);
+      for (const name of options) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.style.color = '#000000ff';
+        if (name === selected) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    function renderHourly(stats) {
+      document.getElementById('hMin').textContent = fmtHourly(stats.min);
+      document.getElementById('hMed').textContent = fmtHourly(stats.median);
+      document.getElementById('hAvg').textContent = fmtHourly(stats.avg);
+      document.getElementById('hMax').textContent = fmtHourly(stats.max);
+      const meta = document.getElementById('hourlyMeta');
+      if (typeof stats.count === 'number' && stats.count > 0) {
+        meta.textContent = `Основано на ${stats.count} ${pluralizeVacancies(stats.count)}`;
+      } else {
+        meta.textContent = 'Недостаточно данных';
+      }
+    }
+
+    (function init() {
+      const ctx = getParams();
+      setContextMeta(ctx);
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        const { protocol, hostname } = window.location;
+        const url = new URL(`${protocol}//${hostname}:8000/dashboard`);
+        url.searchParams.set('query', ctx.query || '');
+        if (ctx.area != null) url.searchParams.set('area', String(ctx.area));
+        if (ctx.pages != null && ctx.pages !== '') url.searchParams.set('pages', String(ctx.pages));
+        if (ctx.per_page != null) url.searchParams.set('per_page', String(ctx.per_page));
+        window.location.href = url.toString();
+      });
+
+      let cachedItems = [];
+      let selectedEmployer = '';
+
+      async function loadAndRender() {
+        document.getElementById('employerMeta').textContent = 'Загрузка...';
+        try {
+          cachedItems = await fetchCompetitors(ctx);
+          const options = computeEmployerOptions(cachedItems);
+          if (!selectedEmployer || !options.includes(selectedEmployer)) {
+            selectedEmployer = options[0] || '';
+          }
+          renderEmployers(options, selectedEmployer);
+          document.getElementById('employerMeta').textContent = selectedEmployer || 'Компания не выбрана';
+          renderHourly(computeHourlyStats(cachedItems, selectedEmployer));
+        } catch (e) {
+          document.getElementById('employerMeta').textContent = 'Не удалось загрузить данные';
+          renderHourly({ count: 0 });
+          console.warn('Failed to load competitors:', e);
+        }
+      }
+
+      document.getElementById('reloadBtn').addEventListener('click', loadAndRender);
+      document.getElementById('employers').addEventListener('change', (e) => {
+        selectedEmployer = e.target.value;
+        document.getElementById('employerMeta').textContent = selectedEmployer || 'Компания не выбрана';
+        renderHourly(computeHourlyStats(cachedItems, selectedEmployer));
+      });
+
+      loadAndRender();
+    })();
+  </script>
+</body>
+</html>
