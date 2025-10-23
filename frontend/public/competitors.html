@@ -148,6 +148,12 @@
         <div class="meta" id="hourlyMeta">Недостаточно данных</div>
       </div>
     </div>
+    <div class="card" style="margin-top:16px;">
+      <h3>ЧТС по компаниям</h3>
+      <div id="companyHourlyContainer">
+        <div class="meta">Загрузка...</div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -193,6 +199,57 @@
       return 'вакансиях';
     }
 
+    // Normalize employer name for robust matching
+    function normalizeName(name) {
+      return (name || '')
+        .toString()
+        .toLowerCase()
+        .replace(/[«»"'`]/g, '')
+        .replace(/[.,]/g, ' ')
+        .replace(/\bооо\b|\bзао\b|\bоао\b|\bпао\b|\bao\b|\boao\b|\bгуп\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // Companies to display with matching rules
+    const COMPANY_MATCHERS = [
+      {
+        label: 'Петербургский Метрополитен, государственное унитарное предприятие',
+        match: (raw) => {
+          const n = normalizeName(raw);
+          return n.includes('петербургск') && n.includes('метрополитен');
+        },
+      },
+      {
+        label: 'ОАО Российские железные дороги',
+        match: (raw) => {
+          const n = normalizeName(raw);
+          return n.includes('ржд') || (n.includes('российск') && n.includes('железн') && n.includes('дорог'));
+        },
+      },
+      {
+        label: 'Ozon',
+        match: (raw) => {
+          const n = normalizeName(raw);
+          return n.includes('ozon');
+        },
+      },
+      {
+        label: 'Авиакомпания Россия',
+        match: (raw) => {
+          const n = normalizeName(raw);
+          return n.includes('авиакомпан') && n.includes('россия');
+        },
+      },
+      {
+        label: 'Теремок',
+        match: (raw) => {
+          const n = normalizeName(raw);
+          return n.includes('теремок');
+        },
+      },
+    ];
+
     function computeHourlyStats(items) {
       const HOURS_PER_MONTH = 164.0;
       const monthly = [];
@@ -222,6 +279,48 @@
         max: hourly[n - 1],
         count: n,
       };
+    }
+
+    function computeCompanyHourlyStats(items) {
+      // Returns array of { label, stats }
+      return COMPANY_MATCHERS.map((m) => {
+        const subset = (items || []).filter((v) => m.match(v?.employer_name || ''));
+        const stats = computeHourlyStats(subset);
+        return { label: m.label, stats };
+      });
+    }
+
+    function renderCompanyHourly(list) {
+      const container = document.getElementById('companyHourlyContainer');
+      if (!container) return;
+      if (!Array.isArray(list) || list.length === 0) {
+        container.innerHTML = '<div class="meta">Недостаточно данных</div>';
+        return;
+      }
+      const head = `
+        <div style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; padding:6px 8px; color:#cbd5e1; font-weight:600; font-size:12px;">
+          <div>Компания</div>
+          <div>Мин</div>
+          <div>Медиана</div>
+          <div>Средняя</div>
+          <div>Макс</div>
+          <div>n</div>
+        </div>
+      `;
+      const rows = list.map(({ label, stats }) => {
+        const s = stats || {};
+        return `
+          <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; align-items:center;">
+            <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${label}</span></div>
+            <div>${fmtHourly(s.min)}</div>
+            <div>${fmtHourly(s.median)}</div>
+            <div>${fmtHourly(s.avg)}</div>
+            <div>${fmtHourly(s.max)}</div>
+            <div style="text-align:right; color:#a5b4fc; font-weight:700;">${typeof s.count === 'number' ? s.count : '—'}</div>
+          </div>
+        `;
+      }).join('');
+      container.innerHTML = head + rows;
     }
 
     async function fetchCompetitors({ query, area, pages, per_page }) {
@@ -295,9 +394,11 @@
           renderRegions(REGION_OPTIONS, selectedArea);
           document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
           renderHourly(computeHourlyStats(cachedItems));
+          renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
           document.getElementById('regionMeta').textContent = 'Не удалось загрузить данные';
           renderHourly({ count: 0 });
+          renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
         }
       }
