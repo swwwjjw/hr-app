@@ -35,7 +35,7 @@ async def fetch_resume_ids_by_query(query: str, area: Optional[int] = None, page
         base_count = 18
     elif "контролер" in query.lower():
         base_count = 12
-    elif "досмотр" in query.lower():
+    elif "досмотр" in query.lower() or "безопасность" in query.lower():
         base_count = 15
     elif "перрон" in query.lower():
         base_count = 8
