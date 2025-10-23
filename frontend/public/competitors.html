@@ -205,35 +205,35 @@
         label: 'Петербургский Метрополитен, государственное унитарное предприятие',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('петербургск') && n.includes('метрополитен');
+          return raw.includes('петербургск') && n.includes('метрополитен');
         },
       },
       {
         label: 'ОАО Российские железные дороги',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('ржд') || (n.includes('российск') && n.includes('железн') && n.includes('дорог'));
+          return raw.includes('ржд') || (n.includes('российск') && n.includes('железн') && n.includes('дорог'));
         },
       },
       {
         label: 'Wildberries',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('wildberries');
+          return raw.includes('wildberries');
         },
       },
       {
         label: 'Авиакомпания Россия',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('авиакомпан') && n.includes('россия');
+          return raw.includes('авиакомпан') && n.includes('россия');
         },
       },
       {
         label: 'Теремок',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('теремок');
+          return raw.includes('теремок');
         },
       },
     ];
