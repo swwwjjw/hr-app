@@ -124,7 +124,6 @@
 <body>
   <div class="container">
     <h1>ЧТС по конкурентам</h1>
-    <div class="meta" id="contextMeta">—</div>
 
     <div class="controls">
       <button id="backBtn" title="Вернуться к вакансиям">К вакансиям</button>
@@ -377,15 +376,15 @@
       let selectedArea = ctx.area;
 
       async function loadAndRender() {
-        document.getElementById('regionMeta').textContent = 'Загрузка...';
+        // document.getElementById('regionMeta').textContent = 'Загрузка...';
         try {
           cachedItems = await fetchCompetitors(ctx);
           renderRegions(REGION_OPTIONS, selectedArea);
-          document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
+          // document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
           renderHourly(computeHourlyStats(cachedItems));
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
-          document.getElementById('regionMeta').textContent = 'Не удалось загрузить данные';
+          // document.getElementById('regionMeta').textContent = 'Не удалось загрузить данные';
           renderHourly({ count: 0 });
           renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
@@ -396,7 +395,7 @@
       document.getElementById('regions').addEventListener('change', (e) => {
         selectedArea = e.target.value;
         ctx.area = selectedArea;
-        document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
+        // document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
         // Re-fetch for the selected region
         loadAndRender();
       });
