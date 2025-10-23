@@ -199,13 +199,17 @@ export const App: React.FC = () => {
 
       {/* Shared controls for query selection */}
       <div className="controls">
-        <select value={query} onChange={(e) => setQuery(e.target.value)}>
-          <option value="">Выберите вакансию</option>
-          {presets.map(p => (
-            <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
-          ))}
-        </select>
-        <button onClick={load} disabled={loading}>Найти</button>
+        {activeTab === 'vacancies' && (
+          <>
+            <select value={query} onChange={(e) => setQuery(e.target.value)}>
+              <option value="">Выберите вакансию</option>
+              {presets.map(p => (
+                <option key={p.value} value={p.value} style={{color: '#000000ff'}}>{p.label}</option>
+              ))}
+            </select>
+            <button onClick={load} disabled={loading}>Найти</button>
+          </>
+        )}
         {activeTab === 'vacancies' && (
           <button onClick={() => setActiveTab('competitors')} title="Перейти к вкладке конкурентов">
             К конкурентам
