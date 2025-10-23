@@ -594,7 +594,6 @@ async def dashboard():
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
-    <button id="searchBtn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8); color:white; border:none; padding:8px 16px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s; margin-left:8px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Найти</button>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
   <div class="card" id="marketCard" style="margin-top:24px; padding:20px;">
@@ -1629,13 +1628,6 @@ async def dashboard():
 
     }
 
-    // 'Найти' button functionality
-    document.getElementById('searchBtn').addEventListener('click', function() {
-      const query = document.getElementById('query').value;
-      if (query.trim()) {
-        window.location.href = `/dashboard?query=${encodeURIComponent(query)}&area=2`;
-      }
-    });
     
     document.getElementById('applyResume').addEventListener('click', applyResumeFromControls);
     const btnCompetitors = document.getElementById('toCompetitors');
