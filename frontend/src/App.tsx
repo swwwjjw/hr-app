@@ -219,7 +219,7 @@ export const App: React.FC = () => {
             }}
             title="Вернуться на порт 8000"
           >
-            На порт 8000
+            К вакансиям
           </button>
         )}
       </div>
