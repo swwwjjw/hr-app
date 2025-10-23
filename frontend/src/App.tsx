@@ -126,11 +126,10 @@ export const App: React.FC = () => {
     const HOURS_PER_MONTH = 164.0;
     const monthly: number[] = [];
     for (const v of competitorItems || []) {
+      if (v?.salary_per_shift === true) continue; // exclude per-shift
+      if (!v?.schedule) continue; // need schedule to treat as hourly-based role
       let m: number | null = null;
-      // Include per-shift vacancies using estimated monthly when present
-      if (v?.salary_per_shift === true) {
-        if (typeof v?.salary_estimated_monthly === 'number') m = v.salary_estimated_monthly as number;
-      } else if (typeof v?.salary_avg === 'number') {
+      if (typeof v?.salary_avg === 'number') {
         m = v.salary_avg as number;
       } else if (v?.salary && typeof v.salary === 'object') {
         const sf = typeof v.salary.from === 'number' ? (v.salary.from as number) : null;
@@ -139,7 +138,7 @@ export const App: React.FC = () => {
         else if (sf !== null) m = sf;
         else if (st !== null) m = st;
       }
-      if (m !== null && m >= 13000) {
+      if (m !== null && m >= 10000) {
         monthly.push(m);
       }
     }

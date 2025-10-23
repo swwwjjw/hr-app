@@ -197,13 +197,10 @@
       const HOURS_PER_MONTH = 164.0;
       const monthly = [];
       for (const v of items || []) {
+        if (v?.salary_per_shift === true) continue; // exclude per-shift
+        if (!v?.schedule) continue; // require schedule
         let m = null;
-        // Include per-shift vacancies by using estimated monthly when available
-        if (v?.salary_per_shift === true) {
-          if (typeof v?.salary_estimated_monthly === 'number') {
-            m = v.salary_estimated_monthly;
-          }
-        } else if (typeof v?.salary_avg === 'number') {
+        if (typeof v?.salary_avg === 'number') {
           m = v.salary_avg;
         } else if (v?.salary && typeof v.salary === 'object') {
           const sf = typeof v.salary.from === 'number' ? v.salary.from : null;
@@ -212,8 +209,7 @@
           else if (sf !== null) m = sf;
           else if (st !== null) m = st;
         }
-        // Use conservative filter to drop implausibly low monthly values
-        if (m !== null && m >= 13000) monthly.push(m);
+        if (m !== null && m >= 10000) monthly.push(m);
       }
       if (!monthly.length) return { count: 0 };
       const hourly = monthly.map(m => m / HOURS_PER_MONTH).sort((a,b) => a-b);
