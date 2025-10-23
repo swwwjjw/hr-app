@@ -176,16 +176,6 @@
       return (REGION_OPTIONS.find(r => String(r.value) === a) || {}).label || a || '—';
     }
 
-    function setContextMeta({ query, area, pages, per_page }) {
-      const meta = document.getElementById('contextMeta');
-      const parts = [];
-      parts.push('Агрегация: все вакансии региона');
-      if (area) parts.push(`Регион: ${regionLabel(area)}`);
-      if (per_page) parts.push(`На странице: ${per_page}`);
-      if (pages) parts.push(`Страниц: ${pages}`);
-      meta.textContent = parts.join(' · ');
-    }
-
     function fmtHourly(v) {
       if (typeof v !== 'number' || !isFinite(v)) return '—';
       return Math.round(v).toLocaleString('ru-RU') + ' ₽/ч';
@@ -372,7 +362,6 @@
 
     (function init() {
       const ctx = getParams();
-      setContextMeta(ctx);
 
       document.getElementById('backBtn').addEventListener('click', () => {
         const { protocol, hostname } = window.location;
@@ -407,7 +396,6 @@
       document.getElementById('regions').addEventListener('change', (e) => {
         selectedArea = e.target.value;
         ctx.area = selectedArea;
-        setContextMeta(ctx);
         document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
         // Re-fetch for the selected region
         loadAndRender();
