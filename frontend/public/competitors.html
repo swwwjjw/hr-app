@@ -328,8 +328,8 @@
       // Intentionally ignore the search query to aggregate by area
       url.searchParams.set('query', '');
       if (area != null) url.searchParams.set('area', String(area));
-      if (pages != null && pages !== '') url.searchParams.set('pages', String(pages));
-      if (per_page != null) url.searchParams.set('per_page', String(per_page));
+      // Always use max page size and fetch all pages to include all vacancies
+      url.searchParams.set('per_page', '100');
       url.searchParams.set('simplified', 'true');
       // employer_mark not required for region-level aggregation, but harmless
       url.searchParams.set('employer_mark', 'false');

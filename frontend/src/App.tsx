@@ -101,8 +101,8 @@ export const App: React.FC = () => {
           // Intentionally ignore the query on competitors tab to aggregate by area
           query: '',
           area,
-          pages,
-          per_page: perPage,
+          // Use maximum page size and fetch all pages to include all vacancies
+          per_page: 100,
           employer_mark: true,
           fetch_all: true,
         });
