@@ -943,7 +943,7 @@ async def dashboard():
         const q3 = percentile(salariesAll, 0.75);
         const iqr = q3 - q1;
         if (iqr > 0) {
-          const highCut = q3 + 1.5 * iqr;
+          const highCut = q3 + 1.75 * iqr;
           const filtered = salariesAll.filter(s => s <= highCut);
           if (filtered.length >= Math.min(3, salariesAll.length)) {
             salaries = filtered;
@@ -951,24 +951,24 @@ async def dashboard():
         }
       } else if (salariesAll.length >= 2) {
         const medSmall = percentile(salariesAll, 0.50);
-        if (salariesAll[salariesAll.length - 1] > 2 * medSmall) {
+        if (salariesAll[salariesAll.length - 1] > 2.25 * medSmall) {
           salaries = salariesAll.slice(0, -1);
         }
       }
 
       // Determine an upper salary threshold for bubble points to hide extreme single values
-      // Use the same Tukey IQR rule when possible; otherwise use a conservative 2x median cap
+      // Use the same Tukey IQR rule when possible; otherwise use a slightly higher 2.25x median cap
       let salaryUpperCap = Number.POSITIVE_INFINITY;
       if (salariesAll.length >= 4) {
         const q1Cap = percentile(salariesAll, 0.25);
         const q3Cap = percentile(salariesAll, 0.75);
         const iqrCap = q3Cap - q1Cap;
         if (iqrCap > 0) {
-          salaryUpperCap = q3Cap + 1.5 * iqrCap;
+          salaryUpperCap = q3Cap + 1.75 * iqrCap;
         }
       } else if (salariesAll.length >= 2) {
         const medSmallCap = percentile(salariesAll, 0.50);
-        salaryUpperCap = 2 * medSmallCap;
+        salaryUpperCap = 2.25 * medSmallCap;
       }
 
       const p25 = percentile(salaries, 0.25);

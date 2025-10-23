@@ -64,7 +64,7 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
     const q1 = sorted.length >= 4 ? quantile(sorted, 0.25) : null;
     const q3 = sorted.length >= 4 ? quantile(sorted, 0.75) : null;
     const iqr = q1 !== null && q3 !== null ? (q3 - q1) : null;
-    const upperFence = iqr !== null ? (q3 as number) + 1.5 * iqr : Number.POSITIVE_INFINITY;
+    const upperFence = iqr !== null ? (q3 as number) + 1.75 * iqr : Number.POSITIVE_INFINITY;
 
     const points = (items || [])
       .map((i) => {
