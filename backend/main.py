@@ -594,7 +594,7 @@ async def dashboard():
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
-    <button id="apply">Найти</button>
+    <!-- 'Найти' button removed -->
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
   <div class="card" id="marketCard" style="margin-top:24px; padding:20px;">
@@ -1517,7 +1517,7 @@ async def dashboard():
 
     }
 
-    document.getElementById('apply').addEventListener('click', applyFromControls);
+    // 'Найти' button removed; no click handler attached
     document.getElementById('applyResume').addEventListener('click', applyResumeFromControls);
     const btnCompetitors = document.getElementById('toCompetitors');
     if (btnCompetitors) btnCompetitors.addEventListener('click', goToCompetitors);
