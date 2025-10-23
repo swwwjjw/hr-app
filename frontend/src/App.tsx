@@ -212,7 +212,15 @@ export const App: React.FC = () => {
           </button>
         )}
         {activeTab === 'competitors' && (
-          null
+          <button
+            onClick={() => {
+              const { protocol, hostname } = window.location;
+              window.location.href = `${protocol}//${hostname}:8000/`;
+            }}
+            title="Вернуться на порт 8000"
+          >
+            На порт 8000
+          </button>
         )}
       </div>
 
