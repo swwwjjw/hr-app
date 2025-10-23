@@ -259,7 +259,7 @@
           else if (sf !== null) m = sf;
           else if (st !== null) m = st;
         }
-        if (m !== null && m >= 10000) monthly.push(m);
+        if (m !== null /*&& m >= 10000*/) monthly.push(m);
       }
       if (!monthly.length) return { count: 0 };
       const hourly = monthly.map(m => m / HOURS_PER_MONTH).sort((a,b) => a-b);
