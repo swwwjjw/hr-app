@@ -242,10 +242,15 @@
       const HOURS_PER_MONTH = 164.0;
       const monthly = [];
       for (const v of items || []) {
-        if (v?.salary_per_shift === true) continue; // exclude per-shift
-        if (!v?.schedule) continue; // require schedule
         let m = null;
-        if (typeof v?.salary_avg === 'number') {
+        // Include per-shift vacancies by using monthly estimate when available
+        if (v?.salary_per_shift === true) {
+          if (typeof v?.salary_estimated_monthly === 'number') {
+            m = v.salary_estimated_monthly;
+          } else {
+            continue;
+          }
+        } else if (typeof v?.salary_avg === 'number') {
           m = v.salary_avg;
         } else if (v?.salary && typeof v.salary === 'object') {
           const sf = typeof v.salary.from === 'number' ? v.salary.from : null;
@@ -270,11 +275,11 @@
     }
 
     function computeCompanyHourlyStats(items) {
-      // Returns array of { label, stats }
+      // Returns array of { label, stats, totalCount }
       return COMPANY_MATCHERS.map((m) => {
         const subset = (items || []).filter((v) => m.match(v?.employer_name || ''));
         const stats = computeHourlyStats(subset);
-        return { label: m.label, stats };
+        return { label: m.label, stats, totalCount: subset.length };
       });
     }
 
@@ -295,7 +300,7 @@
           <div>Количество вакансий</div>
         </div>
       `;
-      const rows = list.map(({ label, stats }) => {
+      const rows = list.map(({ label, stats, totalCount }) => {
         const s = stats || {};
         return `
           <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; align-items:center;">
@@ -304,7 +309,7 @@
             <div>${fmtHourly(s.median)}</div>
             <div>${fmtHourly(s.avg)}</div>
             <div>${fmtHourly(s.max)}</div>
-            <div style="text-align:right; color:#a5b4fc; font-weight:700;">${typeof s.count === 'number' ? s.count : '—'}</div>
+            <div style="text-align:right; color:#a5b4fc; font-weight:700;">${typeof totalCount === 'number' ? totalCount : '—'}</div>
           </div>
         `;
       }).join('');
