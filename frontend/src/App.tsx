@@ -208,7 +208,18 @@ export const App: React.FC = () => {
           </>
         )}
         {activeTab === 'vacancies' && (
-          <button onClick={() => setActiveTab('competitors')} title="Перейти к вкладке конкурентов">
+          <button
+            onClick={() => {
+              const { protocol, hostname } = window.location;
+              const url = new URL(`${protocol}//${hostname}/competitors.html`);
+              url.searchParams.set('query', (query || '').toString());
+              if (area != null) url.searchParams.set('area', String(area));
+              if (pages != null) url.searchParams.set('pages', String(pages));
+              if (perPage != null) url.searchParams.set('per_page', String(perPage));
+              window.location.href = url.toString();
+            }}
+            title="Перейти к вкладке конкурентов"
+          >
             К конкурентам
           </button>
         )}
