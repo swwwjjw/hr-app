@@ -756,7 +756,7 @@ async def dashboard():
       window.location.href = url.toString();
     }
 
-    // Navigate to the React app's competitors tab (port 7000 by default)
+    // Navigate to the static competitors page served by the frontend (nginx on port 80)
     function goToCompetitors() {
       try {
         const { query, area, pages, per_page } = getParams();
@@ -764,17 +764,17 @@ async def dashboard():
         const host = window.location.hostname;
         // Default to frontend served on port 80 (nginx)
         const targetOrigin = `${protocol}//${host}`;
-        const url = new URL(targetOrigin + '/');
-        // Pass through current context and suggest the competitors tab
+        // Open the dedicated static page living in frontend/public/competitors.html
+        const url = new URL(targetOrigin + '/competitors.html');
+        // Pass through current context
         url.searchParams.set('query', query || '');
         url.searchParams.set('area', area || '2');
         if (pages != null) url.searchParams.set('pages', String(pages));
         if (per_page != null) url.searchParams.set('per_page', String(per_page));
-        url.searchParams.set('tab', 'competitors');
         window.location.href = url.toString();
       } catch (e) {
-        // Fallback to root of port 7000
-        const fallback = `${window.location.protocol}//${window.location.hostname}/`;
+        // Fallback to the static page at site root
+        const fallback = `${window.location.protocol}//${window.location.hostname}/competitors.html`;
         window.location.href = fallback;
       }
     }
