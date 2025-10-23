@@ -159,8 +159,8 @@
       const sp = new URLSearchParams(window.location.search);
       const query = sp.get('query') || 'контролер кпп';
       const area = sp.get('area') || '2';
-      const pages = sp.get('pages');
-      const per_page = sp.get('per_page') || '100';
+      const pages = '10';
+      const per_page = '100';
       return { query, area, pages, per_page };
     }
 
@@ -192,11 +192,6 @@
       return (name || '')
         .toString()
         .toLowerCase()
-        // .replace(/[«»"'`]/g, '')
-        // .replace(/[.,]/g, ' ')
-        // .replace(/\bооо\b|\bзао\b|\bоао\b|\bпао\b|\bao\b|\boao\b|\bгуп\b/g, '')
-        // .replace(/\s+/g, ' ')
-        // .trim();
     }
 
     // Companies to display with matching rules
@@ -259,7 +254,7 @@
           else if (sf !== null) m = sf;
           else if (st !== null) m = st;
         }
-        if (m !== null /*&& m >= 10000*/) monthly.push(m);
+        if (m !== null) monthly.push(m);
       }
       if (!monthly.length) return { count: 0 };
       const hourly = monthly.map(m => m / HOURS_PER_MONTH).sort((a,b) => a-b);
