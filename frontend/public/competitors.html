@@ -292,7 +292,6 @@
           <div>Медиана</div>
           <div>Средняя</div>
           <div>Макс</div>
-          <div>Количество вакансий</div>
         </div>
       `;
       const rows = list.map(({ label, stats, totalCount }) => {
@@ -304,7 +303,6 @@
             <div>${fmtHourly(s.median)}</div>
             <div>${fmtHourly(s.avg)}</div>
             <div>${fmtHourly(s.max)}</div>
-            <div style="text-align:right; color:#a5b4fc; font-weight:700;">${typeof totalCount === 'number' ? totalCount : '—'}</div>
           </div>
         `;
       }).join('');
