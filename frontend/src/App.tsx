@@ -215,7 +215,13 @@ export const App: React.FC = () => {
           <button
             onClick={() => {
               const { protocol, hostname } = window.location;
-              window.location.href = `${protocol}//${hostname}:8000/`;
+              const url = new URL(`${protocol}//${hostname}:8000/dashboard`);
+              // Preserve current filters when returning to backend dashboard
+              url.searchParams.set('query', (query || '').toString());
+              if (area != null) url.searchParams.set('area', String(area));
+              if (pages != null) url.searchParams.set('pages', String(pages));
+              if (perPage != null) url.searchParams.set('per_page', String(perPage));
+              window.location.href = url.toString();
             }}
             title="Вернуться на порт 8000"
           >
