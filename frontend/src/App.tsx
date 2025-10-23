@@ -98,7 +98,8 @@ export const App: React.FC = () => {
       setCompetitorLoading(true);
       try {
         const res = await fetchSimplifiedVacancies({
-          query,
+          // Intentionally ignore the query on competitors tab to aggregate by area
+          query: '',
           area,
           pages,
           per_page: perPage,

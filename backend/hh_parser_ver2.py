@@ -66,9 +66,11 @@ async def fetch_vacancies(query: str, area: Optional[int] = None, pages: Optiona
     """
     headers = {"User-Agent": "job-analytics-bot/1.0"}
     params_base = {
-        "text": query,
         "per_page": per_page,
     }
+    # If query is provided and non-empty, include it; otherwise fetch all vacancies for the area
+    if isinstance(query, str) and query.strip():
+        params_base["text"] = query
     if area is not None:
         params_base["area"] = area
 
