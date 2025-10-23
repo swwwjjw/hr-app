@@ -378,10 +378,10 @@
         try {
           cachedItems = await fetchCompetitors(ctx);
           renderRegions(REGION_OPTIONS, selectedArea);
-          renderHourly(computeHourlyStats(cachedItems));
+          //renderHourly(computeHourlyStats(cachedItems));
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
-          renderHourly({ count: 0 });
+          //renderHourly({ count: 0 });
           renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
         }
