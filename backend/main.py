@@ -58,6 +58,7 @@ async def root_redirect():
 cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL = 0
 
+
 def get_cache_key(query: str, area: Optional[int], pages: Optional[int], per_page: int, **kwargs) -> str:
     """Generate a cache key from query parameters."""
     params = {
@@ -244,7 +245,6 @@ async def analyze(
         schedule_obj = item.get("schedule") or {}
         schedule_name = schedule_obj.get("name") if schedule_obj else None
         if schedule_name != "Вахтовый метод":
-            # Exclude targeted vacancy from the 'Контролер КПП' selection
               filtered_items.append(item)
     
     # Use parsed vacancies so per-shift monthly estimates are considered
@@ -592,7 +592,7 @@ async def dashboard():
               <!-- <option value="грузчик склад">Грузчик</option> -->
               <option value="водитель категория D">Водитель</option>
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
-              <option value="уборщик клининг">Уборщик</option>
+              <option value="уборщик клининг">Специалист СБОВС</option>
     </select>
     <button id="apply">Найти</button>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
@@ -717,15 +717,11 @@ async def dashboard():
       const queryToPreset = {
         'контролер кпп': 'контролер кпп',
         'инспектор досмотр': 'инспектор досмотр', 
-        'инспектор перрон': 'инспектор перрон',
-        'гбр охрана': 'гбр охрана',
-        'гбр охрана': 'гбр охрана',
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
         'грузчик склад': 'грузчик склад',
         'грузчик': 'грузчик склад',
         'водитель категория С': 'водитель категория С',
-        'водитель спецтехники': 'водитель категория С',
         'водитель категория D': 'водитель категория D',
         'водитель': 'водитель категория D',
         'уборщик клининг': 'уборщик клининг',
@@ -1065,10 +1061,18 @@ async def dashboard():
           if (monthly > salaryUpperCap) {
             return null;
           }
+          // Check if it's a highlighted company that should have larger bubble size
+          const isHighlightedCompany = isPulkovo || isRossiya || 
+            (v.employer_name && v.employer_name.includes('Петербургский Метрополитен')) ||
+            (v.employer_name && v.employer_name.includes('АО Зенит-Арена')) ||
+            (v.employer_name && v.employer_name.includes('Ozon')) ||
+            (v.employer_name && v.employer_name.includes('Теремок')) ||
+            (v.employer_name && v.employer_name.includes('WILDBERRIES'));
+          
           return {
             x: monthly,
             y: rating,
-            r: isPulkovo ? 12 : (isRossiya ? 12 : 6), // Larger bubble for Pulkovo and Rossiya
+            r: isHighlightedCompany ? 12 : 6, // Larger bubble for highlighted companies
             title: v.title || '',
             employer: v.employer_name || '',
             isPulkovo: isPulkovo
@@ -1174,12 +1178,30 @@ async def dashboard():
       // Separate companies into different datasets
       const pulkovoPoints = points.filter(p => p.isPulkovo);
       const rossiyaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Россия'));
-      const otherPoints = points.filter(p => !p.isPulkovo && !(p.employer && p.employer.includes('Авиакомпания Россия')));
+      const metroPoints = points.filter(p => p.employer && p.employer.includes('Петербургский Метрополитен'));
+      const zenitPoints = points.filter(p => p.employer && p.employer.includes('АО Зенит-Арена'));
+      const ozonPoints = points.filter(p => p.employer && p.employer.includes('Ozon'));
+      const teremokPoints = points.filter(p => p.employer && p.employer.includes('Теремок'));
+      const wildberriesPoints = points.filter(p => p.employer && p.employer.includes('WILDBERRIES'));
+      const otherPoints = points.filter(p => 
+        !p.isPulkovo && 
+        !(p.employer && p.employer.includes('Авиакомпания Россия')) &&
+        !(p.employer && p.employer.includes('Петербургский Метрополитен')) &&
+        !(p.employer && p.employer.includes('АО Зенит-Арена')) &&
+        !(p.employer && p.employer.includes('Ozon')) &&
+        !(p.employer && p.employer.includes('Теремок')) &&
+        !(p.employer && p.employer.includes('WILDBERRIES'))
+      );
       
       console.log('Chart datasets:', {
         totalPoints: points.length,
         pulkovoCount: pulkovoPoints.length,
         rossiyaCount: rossiyaPoints.length,
+        metroCount: metroPoints.length,
+        zenitCount: zenitPoints.length,
+        ozonCount: ozonPoints.length,
+        teremokCount: teremokPoints.length,
+        wildberriesCount: wildberriesPoints.length,
         otherCount: otherPoints.length,
         rossiyaSample: rossiyaPoints.slice(0, 2)
       });
@@ -1230,6 +1252,56 @@ async def dashboard():
               hoverBackgroundColor: 'rgba(239, 68, 68, 0.7)',
               hoverBorderColor: 'rgba(239, 68, 68, 1)',
               hoverBorderWidth: 2
+            },
+            {
+              label: 'Петербургский Метрополитен',
+              data: metroPoints,
+              backgroundColor: 'rgba(6, 57, 112, 0.5)',
+              borderColor: 'rgba(6, 57, 112, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(6, 57, 112, 0.8)',
+              hoverBorderColor: 'rgba(6, 57, 112, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'АО Зенит-Арена',
+              data: zenitPoints,
+              backgroundColor: 'rgba(1, 201, 88, 0.5)',
+              borderColor: 'rgba(1, 201, 88, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(1, 201, 88, 0.8)',
+              hoverBorderColor: 'rgba(1, 201, 88, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'Ozon',
+              data: ozonPoints,
+              backgroundColor: 'rgba(255, 165, 0, 0.5)',
+              borderColor: 'rgba(255, 165, 0, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(255, 165, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 165, 0, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'Теремок',
+              data: teremokPoints,
+              backgroundColor: 'rgba(255, 99, 132, 0.5)',
+              borderColor: 'rgba(255, 99, 132, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(255, 99, 132, 0.8)',
+              hoverBorderColor: 'rgba(255, 99, 132, 1)',
+              hoverBorderWidth: 3
+            },
+            {
+              label: 'WILDBERRIES',
+              data: wildberriesPoints,
+              backgroundColor: 'rgba(147, 51, 234, 0.5)',
+              borderColor: 'rgba(147, 51, 234, 0.9)',
+              borderWidth: 2,
+              hoverBackgroundColor: 'rgba(147, 51, 234, 0.8)',
+              hoverBorderColor: 'rgba(147, 51, 234, 1)',
+              hoverBorderWidth: 3
             }
           ]
         },
@@ -1252,7 +1324,13 @@ async def dashboard():
                 color: '#64748b',
                 padding: 8,
                 usePointStyle: true,
-                pointStyle: 'circle'
+                pointStyle: 'circle',
+                filter: function(legendItem, chartData) {
+                  // Only show legend items for datasets that have data points
+                  const datasetIndex = legendItem.datasetIndex;
+                  const dataset = chartData.datasets[datasetIndex];
+                  return dataset.data && dataset.data.length > 0;
+                }
               }
             },
             tooltip: {
@@ -1337,7 +1415,7 @@ async def dashboard():
       });
 
       // Create salary histogram
-      createSalaryHistogram(salaries, s);
+      createSalaryHistogram(salaries, s, items);
 
       // Resume stats card - automatically collect resume IDs
       try {
@@ -1450,17 +1528,15 @@ async def dashboard():
       const text = e.target.options[e.target.selectedIndex]?.text || '';
       const norm = (s) => (s || '').toString().trim().toLowerCase();
       const presetMap = new Map([
-        ['инспекторы гбр', 'гбр, охрана'],
-        ['инспектор гбр', 'гбр, охрана'],
         ['врач-терапевт', 'врач терапевт'],
         ['врач терапевт', 'врач терапевт'],
         ['грузчик', 'грузчик склад'],
         ['грузчик склад', 'грузчик склад'],
         ['водитель', 'водитель категория D'],
         ['водитель категория D', 'водитель категория D'],
-        ['водитель спецтехники', 'водитель категория С'],
         ['водитель категория С', 'водитель категория С'],
-        ['уборщик', 'уборщик клининг']
+        ['уборщик', 'уборщик клининг'],
+        ['специалист сбовс', 'уборщик клининг']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
@@ -1470,7 +1546,7 @@ async def dashboard():
     });
     
     // Function to create salary histogram
-    function createSalaryHistogram(salaries, salaryStats) {
+    function createSalaryHistogram(salaries, salaryStats, itemsData) {
       const histogramCanvas = document.getElementById('salaryHistogram');
       if (!histogramCanvas) return;
       
@@ -1525,7 +1601,7 @@ async def dashboard():
       for (let i = 0; i < numBins; i++) {
         const binStart = Math.floor(minSalary / binWidth) * binWidth + i * binWidth;
         const binEnd = binStart + binWidth;
-        bins.push({ start: binStart, end: binEnd, count: 0 });
+        bins.push({ start: binStart, end: binEnd, count: 0, hasPulkovo: false });
         // Show range for better clarity
         if (i === numBins - 1) {
           binLabels.push((binStart / 1000).toFixed(0) + 'k+');
@@ -1542,6 +1618,35 @@ async def dashboard():
         }
       });
       
+      // Check which bins contain Pulkovo vacancies using the items data from bubble chart
+      if (typeof itemsData !== 'undefined' && itemsData.length > 0) {
+        itemsData.forEach(v => {
+          // Compute monthly salary value, converting per-shift to monthly when available
+          let monthly = null;
+          if (v.salary_per_shift === true) {
+            if (typeof v.salary_estimated_monthly === 'number') {
+              monthly = v.salary_estimated_monthly;
+            }
+          } else if (typeof v.salary_avg === 'number') {
+            monthly = v.salary_avg;
+          }
+          if (monthly === null && v.salary && typeof v.salary === 'object') {
+            const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
+            const st = (typeof v.salary.to === 'number') ? v.salary.to : null;
+            if (sf !== null && st !== null) monthly = (sf + st) / 2;
+            else if (sf !== null) monthly = sf;
+            else if (st !== null) monthly = st;
+          }
+          
+          if (monthly !== null && monthly >= 13000) {
+            const binIndex = Math.floor((monthly - bins[0].start) / binWidth);
+            if (binIndex >= 0 && binIndex < bins.length && isPulkovoEmployerName(v.employer_name)) {
+              bins[binIndex].hasPulkovo = true;
+            }
+          }
+        });
+      }
+      
       // Find the median value for marking
       const median = salaryStats?.median || 0;
       
@@ -1552,9 +1657,9 @@ async def dashboard():
           datasets: [{
             label: 'Количество вакансий',
             data: bins.map(bin => bin.count),
-            backgroundColor: 'rgba(59, 130, 246, 0.8)',
-            borderColor: 'rgba(59, 130, 246, 1)',
-            borderWidth: 1,
+            backgroundColor: bins.map(bin => bin.hasPulkovo ? 'rgba(6, 182, 212, 0.9)' : 'rgba(59, 130, 246, 0.8)'),
+            borderColor: bins.map(bin => bin.hasPulkovo ? 'rgba(6, 182, 212, 1)' : 'rgba(59, 130, 246, 1)'),
+            borderWidth: bins.map(bin => bin.hasPulkovo ? 3 : 1),
             borderRadius: 4
           }]
         },
@@ -1568,7 +1673,35 @@ async def dashboard():
           },
           plugins: {
             legend: {
-              display: false
+              display: true,
+              position: 'bottom',
+              align: 'center',
+              labels: {
+                font: {
+                  size: 10,
+                  weight: '400'
+                },
+                color: '#c7d1dd',
+                padding: 4,
+                usePointStyle: true,
+                pointStyle: 'rect',
+                generateLabels: function(chart) {
+                  const hasPulkovo = bins.some(bin => bin.hasPulkovo);
+                  if (hasPulkovo) {
+                    return [{
+                      text: 'Пулково',
+                      fillStyle: 'rgba(6, 182, 212, 0.9)',
+                      strokeStyle: 'rgba(6, 182, 212, 1)',
+                      lineWidth: 2,
+                      pointStyle: 'rect',
+                      hidden: false,
+                      index: 0,
+                      fontColor: '#c7d1dd'
+                    }];
+                  }
+                  return [];
+                }
+              }
             },
             tooltip: {
               backgroundColor: 'rgba(30, 41, 59, 0.95)',
@@ -1588,12 +1721,16 @@ async def dashboard():
                   return 'Вакансий: ' + context.parsed.y;
                 },
                 afterLabel: function(context) {
-                  const binIndex = context.dataIndex;
+                  const binIndex = context[0].dataIndex;
                   const bin = bins[binIndex];
-                  if (median >= bin.start && median < bin.end) {
-                    return '📊 Медиана: ' + Math.round(median).toLocaleString() + '₽';
+                  let result = '';
+                  if (bin.hasPulkovo) {
+                    result += '✈️ Содержит вакансии Аэропорт Пулково\n';
                   }
-                  return '';
+                  if (median >= bin.start && median < bin.end) {
+                    result += '📊 Медиана: ' + Math.round(median).toLocaleString() + '₽';
+                  }
+                  return result;
                 }
               }
             }
