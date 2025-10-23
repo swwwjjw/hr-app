@@ -31,5 +31,10 @@ export async function fetchSimplifiedVacancies(params: {
   return res.data;
 }
 
+export async function fetchCompetitorHourlyRates(params: { area?: number } = {}) {
+  const res = await api.get('/competitors-hourly-rates', { params });
+  return res.data;
+}
+
 
 

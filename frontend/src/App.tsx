@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchAnalyze, fetchResumeStats, fetchSimplifiedVacancies } from './api/client';
+import { fetchAnalyze, fetchResumeStats, fetchSimplifiedVacancies, fetchCompetitorHourlyRates } from './api/client';
 import { SalaryBubbleChart } from './components/SalaryBubbleChart';
 import { SalaryStatsCard } from './components/SalaryStatsCard';
 import { HourlyStatsCard } from './components/HourlyStatsCard';
@@ -20,6 +20,7 @@ export const App: React.FC = () => {
   const [competitorItems, setCompetitorItems] = useState<any[]>([]);
   const [selectedEmployer, setSelectedEmployer] = useState<string>('');
   const [competitorReload, setCompetitorReload] = useState(0);
+  const [competitorHourlyRates, setCompetitorHourlyRates] = useState<any>(null);
 
   const presets = useMemo(() => [
     { value: 'контролер кпп', label: 'Инспекторы-контролёры' },
@@ -98,16 +99,23 @@ export const App: React.FC = () => {
       if (activeTab !== 'competitors') return;
       setCompetitorLoading(true);
       try {
-        const res = await fetchSimplifiedVacancies({
-          query,
-          area,
-          pages,
-          per_page: perPage,
-          employer_mark: true,
-          fetch_all: true,
-        });
+        // Load both regular competitor data and hourly rates
+        const [res, hourlyRates] = await Promise.all([
+          fetchSimplifiedVacancies({
+            query,
+            area,
+            pages,
+            per_page: perPage,
+            employer_mark: true,
+            fetch_all: true,
+          }),
+          fetchCompetitorHourlyRates({ area })
+        ]);
+        
         const items = Array.isArray(res?.items) ? res.items : [];
         setCompetitorItems(items);
+        setCompetitorHourlyRates(hourlyRates);
+        
         // Set default employer if not chosen yet
         if (!selectedEmployer) {
           // choose the most frequent employer
@@ -149,43 +157,6 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitorOptions]);
 
-  const competitorHourly = useMemo(() => {
-    if (!selectedEmployer) return {} as any;
-    // Build monthly salaries for the selected employer, excluding per-shift and requiring schedule
-    const HOURS_PER_MONTH = 164.0;
-    const monthly: number[] = [];
-    for (const v of competitorItems || []) {
-      const employerName = (v?.employer_name || '').toString();
-      if (!employerName || employerName !== selectedEmployer) continue;
-      if (v?.salary_per_shift === true) continue; // exclude per-shift
-      if (!v?.schedule) continue; // need schedule to treat as hourly-based role
-      let m: number | null = null;
-      if (typeof v?.salary_avg === 'number') {
-        m = v.salary_avg as number;
-      } else if (v?.salary && typeof v.salary === 'object') {
-        const sf = typeof v.salary.from === 'number' ? (v.salary.from as number) : null;
-        const st = typeof v.salary.to === 'number' ? (v.salary.to as number) : null;
-        if (sf !== null && st !== null) m = (sf + st) / 2;
-        else if (sf !== null) m = sf;
-        else if (st !== null) m = st;
-      }
-      if (m !== null && m >= 10000) {
-        monthly.push(m);
-      }
-    }
-    if (!monthly.length) return {} as any;
-    const hourly = monthly.map((m) => m / HOURS_PER_MONTH).sort((a, b) => a - b);
-    const avg = hourly.reduce((a, b) => a + b, 0) / hourly.length;
-    const n = hourly.length;
-    const median = n % 2 === 1 ? hourly[(n - 1) / 2] : (hourly[n / 2 - 1] + hourly[n / 2]) / 2;
-    return {
-      min: hourly[0],
-      median,
-      avg,
-      max: hourly[hourly.length - 1],
-      count: hourly.length,
-    } as any;
-  }, [competitorItems, selectedEmployer]);
 
   return (
     <div className="container">
@@ -262,19 +233,86 @@ export const App: React.FC = () => {
 
       {/* Competitors Tab */}
       {activeTab === 'competitors' && (
-        <div className="card">
-          <h3>ЧТС по конкурентам</h3>
-          <div className="controls" style={{ marginTop: 8 }}>
-            <select value={selectedEmployer} onChange={(e) => setSelectedEmployer(e.target.value)}>
-              <option value="">Выберите компанию</option>
-              {competitorOptions.map((name) => (
-                <option key={name} value={name} style={{ color: '#000000ff' }}>{name}</option>
-              ))}
-            </select>
-            <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>Обновить</button>
+        <div>
+          <div className="card">
+            <h3>ЧТС по конкурентам</h3>
+            <div className="controls" style={{ marginTop: 8 }}>
+              <button onClick={() => setCompetitorReload((x) => x + 1)} disabled={competitorLoading}>
+                {competitorLoading ? 'Загрузка...' : 'Обновить данные'}
+              </button>
+            </div>
+            
+            {competitorHourlyRates && competitorHourlyRates.company_stats && (
+              <div>
+                <div className="meta" style={{ marginBottom: 16 }}>
+                  Рабочих часов в месяц: {competitorHourlyRates.working_hours_per_month || 168}
+                </div>
+                
+                <div className="grid4" style={{ marginBottom: 24 }}>
+                  <div className="miniCard">
+                    <div>Всего вакансий</div>
+                    <b>{competitorHourlyRates.summary?.total_vacancies || 0}</b>
+                  </div>
+                  <div className="miniCard">
+                    <div>С зарплатой</div>
+                    <b>{competitorHourlyRates.summary?.vacancies_with_salary || 0}</b>
+                  </div>
+                  <div className="miniCard">
+                    <div>Покрытие зарплат</div>
+                    <b>{competitorHourlyRates.summary?.salary_coverage_percent || 0}%</b>
+                  </div>
+                  <div className="miniCard">
+                    <div>Компаний</div>
+                    <b>{Object.keys(competitorHourlyRates.company_stats).length}</b>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <h4>Статистика ЧТС по компаниям</h4>
+                  <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                    {Object.entries(competitorHourlyRates.company_stats).map(([company, stats]: [string, any]) => (
+                      <div key={company} style={{ 
+                        padding: '16px', 
+                        border: '1px solid #e0e0e0', 
+                        borderRadius: '8px',
+                        backgroundColor: '#f9f9f9'
+                      }}>
+                        <h5 style={{ margin: '0 0 8px 0', color: '#333' }}>{company}</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Мин ЧТС</div>
+                            <div style={{ fontWeight: 'bold', color: '#e74c3c' }}>{stats.min} ₽/час</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Макс ЧТС</div>
+                            <div style={{ fontWeight: 'bold', color: '#27ae60' }}>{stats.max} ₽/час</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Средняя ЧТС</div>
+                            <div style={{ fontWeight: 'bold', color: '#3498db' }}>{stats.avg} ₽/час</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Вакансий</div>
+                            <div style={{ fontWeight: 'bold' }}>{stats.count}/{stats.total_vacancies}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Покрытие</div>
+                            <div style={{ fontWeight: 'bold' }}>{stats.salary_coverage}%</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {competitorLoading && (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div>Загрузка данных о ЧТС...</div>
+              </div>
+            )}
           </div>
-          <div className="meta">{selectedEmployer || 'Компания не выбрана'}</div>
-          <HourlyStatsCard hourly={competitorHourly} />
         </div>
       )}
     </div>

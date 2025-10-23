@@ -34,6 +34,7 @@ except Exception:  # ModuleNotFoundError when running with --app-dir backend
         fetch_resume_ids_by_query,
     )
     from analytics import salary_stats, top_skills, hourly_rate_stats
+from hourly_rate_parser import fetch_all_employer_vacancies, analyze_hourly_rates, generate_hourly_rate_report
 
 app = FastAPI(title="Job Analytics API")
 
@@ -1823,6 +1824,57 @@ async def fetch_and_save(query: str = Query(...), area: Optional[int] = Query(No
     with out_path.open("w", encoding="utf-8") as f:
         json.dump({"query": query, "area": area, "pages": pages, "per_page": per_page, "count": len(items), "items": items}, f, ensure_ascii=False, indent=2)
     return {"saved_to": str(out_path), "count": len(items)}
+
+
+@app.get("/competitors-hourly-rates")
+async def competitors_hourly_rates(area: int = Query(2, description="Area ID (2 = Saint-Petersburg)")):
+    """Get hourly rates (ЧТС) for all competitor companies."""
+    try:
+        # Fetch vacancies from all target employers
+        vacancies = await fetch_all_employer_vacancies(area=area, pages=3)
+        
+        # Analyze hourly rates
+        analysis_results = analyze_hourly_rates(vacancies)
+        
+        # Generate report
+        report = generate_hourly_rate_report(analysis_results)
+        
+        # Calculate statistics by company
+        company_stats = {}
+        for company, results in report['by_company'].items():
+            hourly_rates = []
+            for result in results:
+                if result['hourly_rate_info']:
+                    hr_info = result['hourly_rate_info']
+                    if 'hourly_rate' in hr_info:
+                        hourly_rates.append(hr_info['hourly_rate'])
+                    elif 'hourly_rate_min' in hr_info:
+                        hourly_rates.append(hr_info['hourly_rate_min'])
+                    elif 'hourly_rate_max' in hr_info:
+                        hourly_rates.append(hr_info['hourly_rate_max'])
+            
+            if hourly_rates:
+                company_stats[company] = {
+                    'min': round(min(hourly_rates), 2),
+                    'max': round(max(hourly_rates), 2),
+                    'avg': round(sum(hourly_rates) / len(hourly_rates), 2),
+                    'count': len(hourly_rates),
+                    'total_vacancies': len(results),
+                    'salary_coverage': round(len(hourly_rates) / len(results) * 100, 1) if results else 0
+                }
+        
+        return {
+            'summary': report['summary'],
+            'company_stats': company_stats,
+            'working_hours_per_month': report['summary']['working_hours_per_month']
+        }
+        
+    except Exception as e:
+        return {
+            'error': f"Failed to fetch competitor hourly rates: {str(e)}",
+            'company_stats': {},
+            'summary': {'total_vacancies': 0, 'vacancies_with_salary': 0}
+        }
 
 
 if __name__ == '__main__':
