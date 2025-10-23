@@ -211,10 +211,10 @@
         },
       },
       {
-        label: 'Ozon',
+        label: 'Аэропорт Пулково',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('ozon');
+          return n.includes('аэропорт') && n.includes('пулково');
         },
       },
       {
