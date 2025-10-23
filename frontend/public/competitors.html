@@ -131,14 +131,14 @@
     </div>
 
     <div class="card">
-      <h3>Выбор компании</h3>
+      <h3>Выбор региона</h3>
       <div class="controls">
-        <select id="employers">
+        <select id="regions">
           <option value="">Загрузка...</option>
         </select>
         <button id="reloadBtn">Обновить</button>
       </div>
-      <div class="meta" id="employerMeta">Компания не выбрана</div>
+      <div class="meta" id="regionMeta">Регион не выбран</div>
       <div id="hourlyCard">
         <div class="grid4">
           <div class="miniCard"><div>Мин. ЧТС</div><b id="hMin">—</b></div>
@@ -161,11 +161,21 @@
       return { query, area, pages, per_page };
     }
 
+    const REGION_OPTIONS = [
+      { value: '1', label: 'Москва' },
+      { value: '2', label: 'Санкт-Петербург' },
+    ];
+
+    function regionLabel(area) {
+      const a = area == null ? '' : String(area);
+      return (REGION_OPTIONS.find(r => String(r.value) === a) || {}).label || a || '—';
+    }
+
     function setContextMeta({ query, area, pages, per_page }) {
       const meta = document.getElementById('contextMeta');
       const parts = [];
       if (query) parts.push(`Запрос: “${query}”`);
-      if (area) parts.push(`Регион: ${area}`);
+      if (area) parts.push(`Регион: ${regionLabel(area)}`);
       if (per_page) parts.push(`На странице: ${per_page}`);
       if (pages) parts.push(`Страниц: ${pages}`);
       meta.textContent = parts.join(' · ');
@@ -184,25 +194,10 @@
       return 'вакансиях';
     }
 
-    function computeEmployerOptions(items) {
-      const counts = new Map();
-      for (const it of items || []) {
-        const name = (it?.employer_name || '').toString().trim();
-        if (!name) continue;
-        counts.set(name, (counts.get(name) || 0) + 1);
-      }
-      return Array.from(counts.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([name]) => name);
-    }
-
-    function computeHourlyStats(items, selectedEmployer) {
-      if (!selectedEmployer) return { count: 0 };
+    function computeHourlyStats(items) {
       const HOURS_PER_MONTH = 164.0;
       const monthly = [];
       for (const v of items || []) {
-        const employerName = (v?.employer_name || '').toString();
-        if (!employerName || employerName !== selectedEmployer) continue;
         if (v?.salary_per_shift === true) continue; // exclude per-shift
         if (!v?.schedule) continue; // require schedule
         let m = null;
@@ -237,7 +232,8 @@
       if (pages != null && pages !== '') url.searchParams.set('pages', String(pages));
       if (per_page != null) url.searchParams.set('per_page', String(per_page));
       url.searchParams.set('simplified', 'true');
-      url.searchParams.set('employer_mark', 'true');
+      // employer_mark not required for region-level aggregation, but harmless
+      url.searchParams.set('employer_mark', 'false');
       url.searchParams.set('fetch_all', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load data');
@@ -245,19 +241,19 @@
       return Array.isArray(data?.items) ? data.items : [];
     }
 
-    function renderEmployers(options, selected) {
-      const sel = document.getElementById('employers');
+    function renderRegions(options, selected) {
+      const sel = document.getElementById('regions');
       sel.innerHTML = '';
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = 'Выберите компанию';
+      placeholder.textContent = 'Выберите регион';
       sel.appendChild(placeholder);
-      for (const name of options) {
+      for (const r of options) {
         const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
+        opt.value = String(r.value);
+        opt.textContent = r.label;
         opt.style.color = '#000000ff';
-        if (name === selected) opt.selected = true;
+        if (String(r.value) === String(selected)) opt.selected = true;
         sel.appendChild(opt);
       }
     }
@@ -290,31 +286,30 @@
       });
 
       let cachedItems = [];
-      let selectedEmployer = '';
+      let selectedArea = ctx.area;
 
       async function loadAndRender() {
-        document.getElementById('employerMeta').textContent = 'Загрузка...';
+        document.getElementById('regionMeta').textContent = 'Загрузка...';
         try {
           cachedItems = await fetchCompetitors(ctx);
-          const options = computeEmployerOptions(cachedItems);
-          if (!selectedEmployer || !options.includes(selectedEmployer)) {
-            selectedEmployer = options[0] || '';
-          }
-          renderEmployers(options, selectedEmployer);
-          document.getElementById('employerMeta').textContent = selectedEmployer || 'Компания не выбрана';
-          renderHourly(computeHourlyStats(cachedItems, selectedEmployer));
+          renderRegions(REGION_OPTIONS, selectedArea);
+          document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
+          renderHourly(computeHourlyStats(cachedItems));
         } catch (e) {
-          document.getElementById('employerMeta').textContent = 'Не удалось загрузить данные';
+          document.getElementById('regionMeta').textContent = 'Не удалось загрузить данные';
           renderHourly({ count: 0 });
           console.warn('Failed to load competitors:', e);
         }
       }
 
       document.getElementById('reloadBtn').addEventListener('click', loadAndRender);
-      document.getElementById('employers').addEventListener('change', (e) => {
-        selectedEmployer = e.target.value;
-        document.getElementById('employerMeta').textContent = selectedEmployer || 'Компания не выбрана';
-        renderHourly(computeHourlyStats(cachedItems, selectedEmployer));
+      document.getElementById('regions').addEventListener('change', (e) => {
+        selectedArea = e.target.value;
+        ctx.area = selectedArea;
+        setContextMeta(ctx);
+        document.getElementById('regionMeta').textContent = regionLabel(selectedArea) || 'Регион не выбран';
+        // Re-fetch for the selected region
+        loadAndRender();
       });
 
       loadAndRender();
