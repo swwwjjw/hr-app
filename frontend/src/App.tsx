@@ -125,9 +125,11 @@ export const App: React.FC = () => {
   const competitorHourly = useMemo(() => {
     // Aggregate hourly stats across all vacancies in the selected region
     const HOURS_PER_MONTH = 164.0;
-    const monthly: number[] = [];
+    const MIN_VALID_MONTHLY = 13000.0;
+    const monthlyRaw: number[] = [];
     for (const v of competitorItems || []) {
-      if (v?.salary_per_shift === true) continue; // exclude per-shift
+      // Exclude per-shift vacancies from hourly aggregation (no stable monthly base)
+      if (v?.salary_per_shift === true) continue;
       if (!v?.schedule) continue; // need schedule to treat as hourly-based role
       let m: number | null = null;
       if (typeof v?.salary_avg === 'number') {
@@ -139,21 +141,43 @@ export const App: React.FC = () => {
         else if (sf !== null) m = sf;
         else if (st !== null) m = st;
       }
-      if (m !== null && m >= 10000) {
-        monthly.push(m);
+      if (m !== null && m >= MIN_VALID_MONTHLY) {
+        monthlyRaw.push(m);
       }
     }
-    if (!monthly.length) return {} as any;
-    const hourly = monthly.map((m) => m / HOURS_PER_MONTH).sort((a, b) => a - b);
-    const avg = hourly.reduce((a, b) => a + b, 0) / hourly.length;
+    if (!monthlyRaw.length) return {} as any;
+
+    // Apply Tukey IQR upper fence to drop extreme outliers (like dashboard charts)
+    const sorted = monthlyRaw.slice().sort((a, b) => a - b);
+    let filteredMonthly = sorted;
+    if (sorted.length >= 4) {
+      const quantile = (arr: number[], p: number): number => {
+        const pos = (arr.length - 1) * p;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (arr[base + 1] !== undefined) return arr[base] + rest * (arr[base + 1] - arr[base]);
+        return arr[base] ?? 0;
+      };
+      const q1 = quantile(sorted, 0.25);
+      const q3 = quantile(sorted, 0.75);
+      const iqr = q3 - q1;
+      if (iqr > 0) {
+        const upperFence = q3 + 1.5 * iqr;
+        const f = sorted.filter((v) => v <= upperFence);
+        if (f.length > 0) filteredMonthly = f;
+      }
+    }
+
+    const hourly = filteredMonthly.map((m) => m / HOURS_PER_MONTH).sort((a, b) => a - b);
     const n = hourly.length;
+    const avg = hourly.reduce((a, b) => a + b, 0) / n;
     const median = n % 2 === 1 ? hourly[(n - 1) / 2] : (hourly[n / 2 - 1] + hourly[n / 2]) / 2;
     return {
       min: hourly[0],
       median,
       avg,
-      max: hourly[hourly.length - 1],
-      count: hourly.length,
+      max: hourly[n - 1],
+      count: n,
     } as any;
   }, [competitorItems]);
 

@@ -97,8 +97,8 @@ def hourly_rate_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[flo
         if salary is None:
             salary = normalize_salary(v.get("salary"))
         
-        # Check if we have valid salary
-        if salary is None or not isinstance(salary, (int, float)) or salary < 10000:
+        # Check if we have valid salary (use same minimum as salary stats)
+        if salary is None or not isinstance(salary, (int, float)) or salary < 13000:
             continue
             
         # Check if schedule is specified (we assume if schedule exists, it's a regular position)
@@ -112,18 +112,53 @@ def hourly_rate_stats(vacancies: List[Dict[str, Any]]) -> Dict[str, Optional[flo
     
     if not hourly_rates:
         return {"count": 0, "avg": None, "median": None, "min": None, "max": None}
-    
+
+    # Sort and remove high outliers using the same approach as monthly salary stats
     hourly_rates.sort()
-    n = len(hourly_rates)
-    avg = sum(hourly_rates) / n
-    median = hourly_rates[n // 2] if n % 2 == 1 else (hourly_rates[n // 2 - 1] + hourly_rates[n // 2]) / 2
-    
+
+    def percentile(sorted_arr: List[float], p: float) -> float:
+        if not sorted_arr:
+            return float('nan')
+        idx = (len(sorted_arr) - 1) * p
+        lo = math.floor(idx)
+        hi = math.ceil(idx)
+        if lo == hi:
+            return float(sorted_arr[lo])
+        frac = idx - lo
+        return float(sorted_arr[lo]) * (1 - frac) + float(sorted_arr[hi]) * frac
+
+    n_all = len(hourly_rates)
+    filtered = hourly_rates
+    if n_all >= 4:
+        q1 = percentile(hourly_rates, 0.25)
+        q3 = percentile(hourly_rates, 0.75)
+        iqr = q3 - q1
+        if iqr > 0:
+            high_cut = q3 + 1.5 * iqr
+            f = [x for x in hourly_rates if x <= high_cut]
+            if len(f) < 3 and n_all >= 3:
+                # keep at least a small core if filtering dropped too much
+                filtered = hourly_rates[:-1]
+            elif len(f) > 0:
+                filtered = f
+    elif n_all >= 2:
+        med_small = percentile(hourly_rates, 0.50)
+        if hourly_rates[-1] > 2 * med_small:
+            filtered = hourly_rates[:-1]
+
+    if not filtered:
+        filtered = hourly_rates
+
+    n = len(filtered)
+    avg = sum(filtered) / n
+    median = filtered[n // 2] if n % 2 == 1 else (filtered[n // 2 - 1] + filtered[n // 2]) / 2
+
     return {
         "count": n,
         "avg": round(avg, 2),
         "median": round(median, 2),
-        "min": round(hourly_rates[0], 2),
-        "max": round(hourly_rates[-1], 2),
+        "min": round(filtered[0], 2),
+        "max": round(filtered[-1], 2),
     }
 
 
