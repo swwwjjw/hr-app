@@ -136,6 +136,12 @@
           <option value="">Загрузка...</option>
         </select>
       </div>
+      <div id="roleHourlyCard" style="margin-top:12px;">
+        <h3 style="margin-top:0;">ЧТС по вакансиям</h3>
+        <div id="roleHourlyContainer">
+          <div class="meta">Загрузка...</div>
+        </div>
+      </div>
       <!-- <div id="hourlyCard">
         <div class="grid4">
           <div class="miniCard"><div>Мин. ЧТС</div><b id="hMin">—</b></div>
@@ -278,6 +284,83 @@
       });
     }
 
+    // Vacancy presets for regional hourly stats
+    const ROLE_PRESETS = [
+      { value: 'уборщик клининг', label: 'Специалист СБОВС' },
+      { value: 'водитель категория D', label: 'Водитель' },
+      { value: 'врач терапевт', label: 'Врач-терапевт' },
+      { value: 'контролер кпп', label: 'Инспекторы-контролёры' },
+      { value: 'безопасность досмотр', label: 'Инспекторы по досмотру' },
+    ];
+
+    async function fetchRoleHourlyFromApi(query, area) {
+      const url = new URL(window.location.origin + '/api/analyze');
+      url.searchParams.set('query', query || '');
+      if (area != null && area !== '') url.searchParams.set('area', String(area));
+      url.searchParams.set('per_page', '100');
+      url.searchParams.set('fetch_all', 'true');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to load hourly stats');
+      const data = await res.json();
+      return {
+        label: query,
+        hourly: data?.hourly_rates || { count: 0 },
+        totalCount: typeof data?.count === 'number' ? data.count : null,
+      };
+    }
+
+    function renderRoleHourly(list) {
+      const container = document.getElementById('roleHourlyContainer');
+      if (!container) return;
+      if (!Array.isArray(list) || list.length === 0) {
+        container.innerHTML = '<div class="meta">Недостаточно данных</div>';
+        return;
+      }
+      const head = `
+        <div style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 1fr; gap:10px; padding:6px 8px; color:#cbd5e1; font-weight:600; font-size:12px;">
+          <div>Вакансия</div>
+          <div>Мин</div>
+          <div>Медиана</div>
+          <div>Средняя</div>
+          <div>Макс</div>
+          <div style="text-align:right;">Основано на</div>
+        </div>
+      `;
+      const rows = list.map((it) => {
+        const s = it?.hourly || {};
+        const label = (ROLE_PRESETS.find(p => p.value === it.label)?.label) || it.label || '';
+        const countText = (typeof s.count === 'number' && s.count > 0)
+          ? `${s.count} ${pluralizeVacancies(s.count)}`
+          : '—';
+        return `
+          <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 1fr; gap:10px; align-items:center;">
+            <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${label}</span></div>
+            <div>${fmtHourly(s.min)}</div>
+            <div>${fmtHourly(s.median)}</div>
+            <div>${fmtHourly(s.avg)}</div>
+            <div>${fmtHourly(s.max)}</div>
+            <div style="text-align:right; color:#cbd5e1; font-size:12px;">${countText}</div>
+          </div>
+        `;
+      }).join('');
+      container.innerHTML = head + rows;
+    }
+
+    async function loadRoleHourly(area) {
+      const container = document.getElementById('roleHourlyContainer');
+      if (container) container.innerHTML = '<div class="meta">Загрузка...</div>';
+      try {
+        const results = await Promise.all(
+          ROLE_PRESETS.map(p => fetchRoleHourlyFromApi(p.value, area))
+        );
+        // Sort by preset order (already preserved by map)
+        renderRoleHourly(results);
+      } catch (e) {
+        if (container) container.innerHTML = '<div class="meta">Не удалось загрузить данные</div>';
+        console.warn('Failed to load role hourly stats:', e);
+      }
+    }
+
     function renderCompanyHourly(list) {
       const container = document.getElementById('companyHourlyContainer');
       if (!container) return;
@@ -376,10 +459,12 @@
         try {
           cachedItems = await fetchCompetitors(ctx);
           renderRegions(REGION_OPTIONS, selectedArea);
-          //renderHourly(computeHourlyStats(cachedItems));
+          // Regional hourly stats for specific roles
+          await loadRoleHourly(selectedArea);
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
           //renderHourly({ count: 0 });
+          renderRoleHourly([]);
           renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
         }
