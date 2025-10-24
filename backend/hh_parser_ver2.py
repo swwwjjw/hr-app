@@ -812,19 +812,24 @@ async def enrich_with_descriptions(items: List[Dict[str, Any]], prefer_scrape: b
     await _aio.gather(*[_one(v) for v in items])
 
 
-async def parse_vacancies(items: List[Dict[str, Any]], with_employer_mark: bool = False) -> List[Dict[str, Any]]:
+async def parse_vacancies(
+    items: List[Dict[str, Any]],
+    with_employer_mark: bool = False,
+    exclude_vakhta: bool = True,
+) -> List[Dict[str, Any]]:
     """Produce simplified vacancy dicts with selected fields.
     If with_employer_mark, compute employer marks from available data (fast approach).
-    Excludes vacancies with "Вахтовый метод" schedule.
+    Optionally exclude vacancies with the "Вахтовый метод" schedule when exclude_vakhta=True.
     """
-    parsed = []
+    parsed: List[Dict[str, Any]] = []
     for v in items:
         # Extract fields first to get schedule information
         parsed_item = extract_vacancy_fields(v)
-        # Filter out vacancies with "Вахтовый метод" schedule
-        if parsed_item.get("schedule") != "Вахтовый метод":
-            parsed.append(parsed_item)
-    
+        # Optionally filter out vacancies with "Вахтовый метод" schedule
+        if exclude_vakhta and parsed_item.get("schedule") == "Вахтовый метод":
+            continue
+        parsed.append(parsed_item)
+
     if with_employer_mark:
         # Use only fast computed marks (no web scraping)
         computed = compute_employer_marks(parsed)
