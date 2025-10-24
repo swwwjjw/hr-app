@@ -152,6 +152,12 @@
         <div class="meta">Загрузка...</div>
       </div>
     </div>
+    <div class="card" style="margin-top:16px;">
+      <h3>Топ‑5 вакансий по ЧТС</h3>
+      <div id="topVacanciesContainer">
+        <div class="meta">Загрузка...</div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -309,6 +315,90 @@
       container.innerHTML = head + rows;
     }
 
+    // --- Top-5 vacancies by hourly rate (from main dashboard query) ---
+    function computeVacancyHourly(v) {
+      const HOURS_PER_MONTH = 164.0;
+      let m = null;
+      if (v?.salary_per_shift === true) {
+        if (typeof v?.salary_estimated_monthly === 'number') m = v.salary_estimated_monthly;
+      } else if (typeof v?.salary_avg === 'number') {
+        m = v.salary_avg;
+      } else if (v?.salary && typeof v.salary === 'object') {
+        const sf = typeof v.salary.from === 'number' ? v.salary.from : null;
+        const st = typeof v.salary.to === 'number' ? v.salary.to : null;
+        if (sf !== null && st !== null) m = (sf + st) / 2;
+        else if (sf !== null) m = sf;
+        else if (st !== null) m = st;
+      }
+      if (m == null) return null;
+      return m / HOURS_PER_MONTH;
+    }
+
+    function computeHourlyStatsFromVacancies(vacancies) {
+      const vals = (vacancies || [])
+        .map((v) => computeVacancyHourly(v))
+        .filter((h) => typeof h === 'number' && isFinite(h))
+        .sort((a, b) => a - b);
+      if (!vals.length) return { count: 0 };
+      const n = vals.length;
+      const median = n % 2 === 1 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
+      return { min: vals[0], median, avg: vals.reduce((a, b) => a + b, 0) / n, max: vals[n - 1], count: n };
+    }
+
+    function renderTopVacancies(items, topN = 5) {
+      const container = document.getElementById('topVacanciesContainer');
+      if (!container) return;
+      const withHourly = (items || [])
+        .map((v) => ({ v, h: computeVacancyHourly(v) }))
+        .filter((x) => typeof x.h === 'number' && isFinite(x.h))
+        .sort((a, b) => b.h - a.h)
+        .slice(0, topN);
+      if (withHourly.length === 0) {
+        container.innerHTML = '<div class="meta">Недостаточно данных</div>';
+        return;
+      }
+      const stats = computeHourlyStatsFromVacancies(withHourly.map((x) => x.v));
+      const summary = `
+        <div class="grid4" style="margin-bottom:12px;">
+          <div class="miniCard"><div>Мин. ЧТС</div><b>${fmtHourly(stats.min)}</b></div>
+          <div class="miniCard"><div>Медиана ЧТС</div><b>${fmtHourly(stats.median)}</b></div>
+          <div class="miniCard"><div>Средняя ЧТС</div><b>${fmtHourly(stats.avg)}</b></div>
+          <div class="miniCard"><div>Макс. ЧТС</div><b>${fmtHourly(stats.max)}</b></div>
+        </div>
+        <div class="meta">Основано на ${withHourly.length} ${pluralizeVacancies(withHourly.length)}</div>
+      `;
+      const head = `
+        <div style="display:grid; grid-template-columns: 2fr 2fr 1fr; gap:10px; padding:6px 8px; color:#cbd5e1; font-weight:600; font-size:12px;">
+          <div>Вакансия</div>
+          <div>Компания</div>
+          <div>ЧТС</div>
+        </div>
+      `;
+      const rows = withHourly.map(({ v, h }) => `
+        <div class="miniCard" style="display:grid; grid-template-columns: 2fr 2fr 1fr; gap:10px; align-items:center;">
+          <div>${(v?.title || '').toString().slice(0, 80)}</div>
+          <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${(v?.employer_name || '—').toString().slice(0, 60)}</span></div>
+          <div style="font-weight:700; color:#80b9ff;">${fmtHourly(h)}</div>
+        </div>
+      `).join('');
+      container.innerHTML = summary + head + rows;
+    }
+
+    async function fetchTopVacanciesForQuery({ query, area, pages, per_page }) {
+      const url = new URL(window.location.origin + '/api/fetch');
+      url.searchParams.set('query', String(query || ''));
+      if (area != null) url.searchParams.set('area', String(area));
+      if (pages != null && pages !== '') url.searchParams.set('pages', String(pages));
+      url.searchParams.set('per_page', String(per_page || '100'));
+      url.searchParams.set('simplified', 'true');
+      url.searchParams.set('employer_mark', 'false');
+      url.searchParams.set('fetch_all', 'true');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to load query vacancies');
+      const data = await res.json();
+      return Array.isArray(data?.items) ? data.items : [];
+    }
+
     async function fetchCompetitors({ query, area, pages, per_page }) {
       const url = new URL(window.location.origin + '/api/fetch');
       // Intentionally ignore the search query to aggregate by area
@@ -374,13 +464,19 @@
 
       async function loadAndRender() {
         try {
-          cachedItems = await fetchCompetitors(ctx);
+          const [allItems, queryItems] = await Promise.all([
+            fetchCompetitors(ctx),
+            fetchTopVacanciesForQuery(ctx),
+          ]);
+          cachedItems = allItems;
           renderRegions(REGION_OPTIONS, selectedArea);
           //renderHourly(computeHourlyStats(cachedItems));
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
+          renderTopVacancies(queryItems, 5);
         } catch (e) {
           //renderHourly({ count: 0 });
           renderCompanyHourly([]);
+          renderTopVacancies([]);
           console.warn('Failed to load competitors:', e);
         }
       }
