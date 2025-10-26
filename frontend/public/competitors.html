@@ -142,7 +142,7 @@
           <div class="meta">Загрузка...</div>
         </div>
       </div>
-      <!-- <div id="hourlyCard">
+      <div id="hourlyCard">
         <div class="grid4">
           <div class="miniCard"><div>Мин. ЧТС</div><b id="hMin">—</b></div>
           <div class="miniCard"><div>Медиана ЧТС</div><b id="hMed">—</b></div>
@@ -150,7 +150,7 @@
           <div class="miniCard"><div>Макс. ЧТС</div><b id="hMax">—</b></div>
         </div>
         <div class="meta" id="hourlyMeta">Недостаточно данных</div>
-      </div> -->
+      </div>
     </div>
     <div class="card" style="margin-top:16px;">
       <h3>ЧТС по компаниям</h3>
@@ -485,11 +485,13 @@
         try {
           cachedItems = await fetchCompetitors(ctx);
           renderRegions(REGION_OPTIONS, selectedArea);
+          // Общая статистика по ЧТС для выбранного региона
+          renderHourly(computeHourlyStats(cachedItems));
           // Regional hourly stats for specific roles
           await loadRoleHourly(selectedArea);
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
-          //renderHourly({ count: 0 });
+          renderHourly({ count: 0 });
           renderRoleHourly([]);
           renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
