@@ -335,6 +335,20 @@
       };
     }
 
+    // Fetch raw items for a specific role (used to build combined hourly stats for the five roles)
+    async function fetchRoleItemsFromApi(query, area) {
+      const url = new URL(window.location.origin + '/api/fetch');
+      url.searchParams.set('query', query || '');
+      if (area != null && area !== '') url.searchParams.set('area', String(area));
+      url.searchParams.set('per_page', '100');
+      url.searchParams.set('simplified', 'true');
+      url.searchParams.set('fetch_all', 'true');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error('Failed to load hourly items');
+      const data = await res.json();
+      return Array.isArray(data?.items) ? data.items : [];
+    }
+
     function renderRoleHourly(list) {
       const container = document.getElementById('roleHourlyContainer');
       if (!container) return;
@@ -485,8 +499,26 @@
         try {
           cachedItems = await fetchCompetitors(ctx);
           renderRegions(REGION_OPTIONS, selectedArea);
-          // Общая статистика по ЧТС для выбранного региона
-          renderHourly(computeHourlyStats(cachedItems));
+          // Общая статистика по ЧТС формируется ТОЛЬКО по 5 выбранным вакансиям
+          const roleItemsLists = await Promise.all(
+            ROLE_PRESETS.map(p => fetchRoleItemsFromApi(p.value, selectedArea))
+          );
+          const mergedRoleItems = (() => {
+            const seen = new Set();
+            const acc = [];
+            for (const arr of roleItemsLists) {
+              for (const v of arr || []) {
+                const id = v?.id;
+                if (id != null) {
+                  if (seen.has(id)) continue;
+                  seen.add(id);
+                }
+                acc.push(v);
+              }
+            }
+            return acc;
+          })();
+          renderHourly(computeHourlyStats(mergedRoleItems));
           // Regional hourly stats for specific roles
           await loadRoleHourly(selectedArea);
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
