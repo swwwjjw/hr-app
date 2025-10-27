@@ -301,7 +301,7 @@
     function computeCompanyHourlyStats(items) {
       // Returns array of { label, stats, totalCount }
       return COMPANY_MATCHERS.map((m) => {
-        const subset = (items || [])/*.filter((v) => m.match(v?.employer_name || ''))*/;
+        const subset = (items || []).filter((v) => m.match(v?.employer_name || ''));
         const stats = computeHourlyStats(subset);
         return { label: m.label, stats, totalCount: subset.length };
       });
