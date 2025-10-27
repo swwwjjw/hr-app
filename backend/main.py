@@ -670,6 +670,35 @@ async def dashboard():
     </div>
   </div>
   <script>
+    // Persisted state for "С проектом \"Мы команда\"" button
+    try {
+      const savedTeamProject = localStorage.getItem('teamProjectActive');
+      if (savedTeamProject !== null) {
+        window.teamProjectActive = (savedTeamProject === '1' || savedTeamProject === 'true');
+      }
+    } catch (e) {
+      // Ignore persistence errors (privacy mode, etc.)
+    }
+
+    // Helper to compute additional salary for current query when team project is active
+    function getTeamProjectAdditionalForQuery(normalizedQuery) {
+      if (!window.teamProjectActive) return 0;
+      // Protect against null/undefined
+      const q = (normalizedQuery || '').toString().trim().toLowerCase();
+      // Treat "водитель" as a separate word to avoid matching "руководитель"
+      const qSpaced = ` ${q} `;
+      if (q.includes('контролер кпп')) {
+        return 16452;
+      } else if (q.includes('безопасность досмотр') || q.includes('досмотр')) {
+        return 84629;
+      } else if (q.includes('уборщик клининг') || q.includes('специалист сбовс')) {
+        return 76798;
+      } else if (q.includes('водитель категория d') || qSpaced.includes(' водитель ')) {
+        // Additional for "Водитель" (категория D и общий случай)
+        return 81234;
+      }
+      return 0;
+    }
     // Helper to strictly detect Pulkovo operator company in employer names
     function isPulkovoEmployerName(name) {
       const raw = (name || '').toString().toLowerCase();
@@ -1002,21 +1031,9 @@ async def dashboard():
       window.currentSalaries = [...salaries];
       
       // Add additional salary amounts to Pulkovo salaries based on query and button state
-      let additionalPulkovoSalary = 0;
-      const teamProjectActive = window.teamProjectActive || false;
-      
-      if (teamProjectActive) {
-        const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
-        const normalizedQuery = currentQuery.toLowerCase().trim();
-        
-        if (normalizedQuery.includes('контролер кпп')) {
-          additionalPulkovoSalary = 16452;
-        } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
-          additionalPulkovoSalary = 84629;
-        } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
-          additionalPulkovoSalary = 76798;
-        }
-      }
+      const currentQueryForAdd = new URLSearchParams(window.location.search).get('query') || '';
+      const normalizedQueryForAdd = currentQueryForAdd.toLowerCase().trim();
+      const additionalPulkovoSalary = getTeamProjectAdditionalForQuery(normalizedQueryForAdd);
       
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
 
@@ -1079,17 +1096,11 @@ async def dashboard():
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
 
           // Add additional salary to Pulkovo vacancies only when button is active
-          if (isPulkovo && monthly !== null && window.teamProjectActive) {
-            const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
-            const normalizedQuery = currentQuery.toLowerCase().trim();
-            
-            if (normalizedQuery.includes('контролер кпп')) {
-              monthly += 16452;
-            } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
-              monthly += 84629;
-            } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
-              monthly += 76798;
-            }
+          if (isPulkovo && monthly !== null) {
+            const currentQueryPts = new URLSearchParams(window.location.search).get('query') || '';
+            const normalizedQueryPts = currentQueryPts.toLowerCase().trim();
+            const addPts = getTeamProjectAdditionalForQuery(normalizedQueryPts);
+            if (addPts > 0) monthly += addPts;
           }
 
 
@@ -1667,21 +1678,9 @@ async def dashboard():
       let histogramSalaries = salaries.length > 0 ? salaries : [];
       
       // Add additional salary to Pulkovo salaries for histogram only when button is active
-      let additionalPulkovoSalary = 0;
-      const teamProjectActive = window.teamProjectActive || false;
-      
-      if (teamProjectActive) {
-        const currentQuery = new URLSearchParams(window.location.search).get('query') || '';
-        const normalizedQuery = currentQuery.toLowerCase().trim();
-        
-        if (normalizedQuery.includes('контролер кпп')) {
-          additionalPulkovoSalary = 16452;
-        } else if (normalizedQuery.includes('безопасность досмотр') || normalizedQuery.includes('досмотр')) {
-          additionalPulkovoSalary = 84629;
-        } else if (normalizedQuery.includes('уборщик клининг') || normalizedQuery.includes('специалист сбовс')) {
-          additionalPulkovoSalary = 76798;
-        }
-      }
+      const currentQueryHist = new URLSearchParams(window.location.search).get('query') || '';
+      const normalizedQueryHist = currentQueryHist.toLowerCase().trim();
+      const additionalPulkovoSalary = getTeamProjectAdditionalForQuery(normalizedQueryHist);
       
       // Add additional salary to histogram data if there are Pulkovo vacancies and button is active
       if (additionalPulkovoSalary > 0 && histogramSalaries.length > 0) {
@@ -1946,7 +1945,8 @@ async def dashboard():
         return;
       }
       
-      let teamProjectActive = window.teamProjectActive || false;
+      // Initialize from global state (possibly restored from localStorage above)
+      let teamProjectActive = Boolean(window.teamProjectActive);
       
       // Restore button state on page load
       if (teamProjectActive) {
@@ -1958,6 +1958,11 @@ async def dashboard():
         console.log('Team project button clicked!');
         teamProjectActive = !teamProjectActive;
         window.teamProjectActive = teamProjectActive; // Set global state
+        try {
+          localStorage.setItem('teamProjectActive', teamProjectActive ? '1' : '0');
+        } catch (e) {
+          // Ignore persistence errors
+        }
         
         if (teamProjectActive) {
           teamProjectBtn.style.background = 'linear-gradient(135deg, #059669, #047857)';
