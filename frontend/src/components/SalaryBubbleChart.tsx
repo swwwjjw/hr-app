@@ -28,6 +28,27 @@ type Item = {
 
 export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
   const data = useMemo(() => {
+    // Helper: detect Pulkovo operator by employer name (robust normalization)
+    const isPulkovoEmployerName = (name?: string | null): boolean => {
+      const raw = (name || '').toString().toLowerCase();
+      const normalized = raw
+        .replace(/[«»"'`]/g, '')
+        .replace(/[\.,]/g, ' ')
+        .replace(/\b(ооо|оао|пао|зао|ao|oao|zao)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!normalized) return false;
+      const accepted = new Set([
+        'аэропорт пулково',
+        'воздушные ворота северной столицы',
+        'аэропорт пулково (воздушные ворота северной столицы)'
+      ]);
+      if (accepted.has(normalized)) return true;
+      return (
+        normalized.includes('аэропорт пулково') &&
+        normalized.includes('воздушные ворота северной столицы')
+      );
+    };
     // Helper to compute monthly salary from an item
     const toMonthly = (i: Item): number | null => {
       let monthly: number | null = null;
@@ -73,8 +94,9 @@ export const SalaryBubbleChart: React.FC<{ items: Item[] }> = ({ items }) => {
         if (monthly === null || employerMark === null || monthly < 13000) {
           return null;
         }
-        // Filter out extreme outliers by salary
-        if (monthly > upperFence) {
+        const isPulkovo = isPulkovoEmployerName(i?.employer_name);
+        // Filter out extreme outliers by salary, but ALWAYS keep Pulkovo
+        if (!isPulkovo && monthly > upperFence) {
           return null;
         }
         return {

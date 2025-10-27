@@ -1108,7 +1108,8 @@ async def dashboard():
             return null;
           }
           // Hide extreme salary outliers from the bubble chart
-          if (monthly > salaryUpperCap) {
+          // IMPORTANT: Always keep Pulkovo points visible even if they exceed caps
+          if (!isPulkovo && monthly > salaryUpperCap) {
             return null;
           }
           // Check if it's a highlighted company that should have larger bubble size
@@ -1715,8 +1716,38 @@ async def dashboard():
       }
       
       // Create salary bins (buckets)
-      const minSalary = Math.min(...histogramSalaries);
-      const maxSalary = Math.max(...histogramSalaries);
+      // Ensure the bin range always includes Pulkovo values so they are visible
+      let minSalary = Math.min(...histogramSalaries);
+      let maxSalary = Math.max(...histogramSalaries);
+      if (Array.isArray(itemsData) && itemsData.length > 0) {
+        const pulkovoMonthlyValues = [];
+        for (const v of itemsData) {
+          let monthly = null;
+          if (v && v.salary_per_shift === true) {
+            if (typeof v.salary_estimated_monthly === 'number') {
+              monthly = v.salary_estimated_monthly;
+            }
+          } else if (v && typeof v.salary_avg === 'number') {
+            monthly = v.salary_avg;
+          }
+          if (monthly === null && v && v.salary && typeof v.salary === 'object') {
+            const sf = (typeof v.salary.from === 'number') ? v.salary.from : null;
+            const st = (typeof v.salary.to === 'number') ? v.salary.to : null;
+            if (sf !== null && st !== null) monthly = (sf + st) / 2;
+            else if (sf !== null) monthly = sf;
+            else if (st !== null) monthly = st;
+          }
+          if (monthly !== null && monthly >= 13000 && isPulkovoEmployerName(v.employer_name)) {
+            pulkovoMonthlyValues.push(monthly);
+          }
+        }
+        if (pulkovoMonthlyValues.length > 0) {
+          const pulMin = Math.min(...pulkovoMonthlyValues);
+          const pulMax = Math.max(...pulkovoMonthlyValues);
+          if (isFinite(pulMin)) minSalary = Math.min(minSalary, pulMin);
+          if (isFinite(pulMax)) maxSalary = Math.max(maxSalary, pulMax);
+        }
+      }
       
       // Ensure at least 4 bins by adjusting bin width
       let binWidth = 50000; // 50k руб per bin
