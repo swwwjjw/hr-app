@@ -206,14 +206,14 @@
         label: 'Петербургский Метрополитен, государственное унитарное предприятие',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('петербургск') && n.includes('метрополитен');
+          return n.includes('петербургский') && n.includes('метрополитен');
         },
       },
       {
         label: 'ОАО Российские железные дороги',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('ржд') || ((n.includes('российск') && n.includes('железн') && n.includes('дорог')));
+          return n.includes('ржд') || ((n.includes('российские') && n.includes('железные') && n.includes('дороги')));
         },
       },
       // {
@@ -227,7 +227,7 @@
         label: 'АО Авиакомпания Россия',
         match: (raw) => {
           const n = normalizeName(raw);
-          return n.includes('авиакомпан') && n.includes('россия');
+          return n.includes('авиакомпания') && n.includes('россия');
         },
       },
       {
