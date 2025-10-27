@@ -584,9 +584,9 @@ async def dashboard():
     <input id="q" placeholder="query (e.g. python developer)" style="display: none;" />
     <select id="presets">
       <option value="">Выберите вакансию</option>
-      <option value="контролер кпп">Инспекторы-контролёры</option>
-      <option value="безопасность досмотр">Инспекторы по досмотру</option>
-      <!-- <option value="инспектор перрон">Инспекторы перронного контроля</option> -->
+      <option value="контролер кпп">Инспектор-контролёр</option>
+      <option value="безопасность досмотр">Инспектор по досмотру</option>
+      <!-- <option value="инспектор перрон">Инспектор перронного контроля</option> -->
       <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
       <option value="врач терапевт">Врач-терапевт</option>
               <!-- <option value="грузчик склад">Грузчик</option> -->
