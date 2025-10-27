@@ -695,7 +695,7 @@ async def dashboard():
         return 76798;
       } else if (q.includes('водитель категория d') || qSpaced.includes(' водитель ')) {
         // Additional for "Водитель" (категория D и общий случай)
-        return 81234;
+        return 59320;
       }
       return 0;
     }
