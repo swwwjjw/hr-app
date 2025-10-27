@@ -242,6 +242,19 @@
         .trim();
     }
 
+    // Strictly detect Pulkovo by employer name
+    function isPulkovoEmployerName(name) {
+      const normalized = normalizeEmployerName(name);
+      if (!normalized) return false;
+      const accepted = new Set([
+        'аэропорт пулково',
+        'воздушные ворота северной столицы',
+        'аэропорт пулково (воздушные ворота северной столицы)'
+      ]);
+      if (accepted.has(normalized)) return true;
+      return normalized.includes('аэропорт пулково') && normalized.includes('воздушные ворота северной столицы');
+    }
+
     function matchesEmployerGroup(v, group) {
       const id = String(v?.employer_id || '');
       if (Array.isArray(group.ids) && group.ids.some((x) => String(x) === id)) return true;
@@ -250,10 +263,11 @@
       return pats.some((p) => p && name.includes(p));
     }
 
-    function computeHourlyStats(items) {
+    function computeHourlyStats(items, opts) {
       const HOURS_PER_MONTH = 164.0;
       const MIN_VALID_MONTHLY = 13000.0;
-      const monthlyRaw = [];
+      const keepPulkovo = Boolean(opts && opts.keepPulkovo);
+      const monthlyDetailed = [];
       for (const v of items || []) {
         let m = null;
         // Include per-shift vacancies by using monthly estimate when available
@@ -272,13 +286,16 @@
           else if (sf !== null) m = sf;
           else if (st !== null) m = st;
         }
-        if (m !== null && m >= MIN_VALID_MONTHLY) monthlyRaw.push(m);
+        if (m !== null && m >= MIN_VALID_MONTHLY) {
+          monthlyDetailed.push({ value: m, isPulkovo: isPulkovoEmployerName(v?.employer_name) });
+        }
       }
-      if (!monthlyRaw.length) return { count: 0 };
+      if (!monthlyDetailed.length) return { count: 0 };
 
       // Robust outlier filtering based on Tukey's IQR fence (Q3 + 1.5*IQR)
-      const sorted = monthlyRaw.slice().sort((a, b) => a - b);
-      let filteredMonthly = sorted;
+      const sortedPairs = monthlyDetailed.slice().sort((a, b) => a.value - b.value);
+      const sorted = sortedPairs.map(p => p.value);
+      let filteredMonthly = sortedPairs;
       if (sorted.length >= 4) {
         const quantile = (arr, p) => {
           const pos = (arr.length - 1) * p;
@@ -292,12 +309,12 @@
         const iqr = q3 - q1;
         if (iqr > 0) {
           const upperFence = q3 + 1.5 * iqr;
-          const f = sorted.filter((v) => v <= upperFence);
-          if (f.length > 0) filteredMonthly = f;
+          const fPairs = sortedPairs.filter((p) => p.value <= upperFence || (keepPulkovo && p.isPulkovo));
+          if (fPairs.length > 0) filteredMonthly = fPairs;
         }
       }
 
-      const hourly = filteredMonthly.map((m) => m / HOURS_PER_MONTH).sort((a, b) => a - b);
+      const hourly = filteredMonthly.map((p) => p.value / HOURS_PER_MONTH).sort((a, b) => a - b);
       const n = hourly.length;
       const median = n % 2 === 1 ? hourly[(n - 1) / 2] : (hourly[n / 2 - 1] + hourly[n / 2]) / 2;
       return {
@@ -313,7 +330,8 @@
       // Returns array of { label, stats, totalCount, usedCount } using IDs and name patterns
       return EMPLOYER_GROUPS.map((g) => {
         const subset = (items || []).filter((v) => matchesEmployerGroup(v, g));
-        const stats = computeHourlyStats(subset);
+        const keepPulkovo = g && g.label && g.label.toLowerCase().includes('пулково');
+        const stats = computeHourlyStats(subset, { keepPulkovo });
         const usedCount = typeof stats.count === 'number' ? stats.count : 0;
         return { label: g.label, stats, totalCount: subset.length, usedCount };
       });
