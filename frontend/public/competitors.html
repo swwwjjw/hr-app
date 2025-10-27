@@ -289,6 +289,8 @@
       if (area != null && area !== '') url.searchParams.set('area', String(area));
       url.searchParams.set('per_page', '100');
       url.searchParams.set('simplified', 'true');
+      // Include descriptions to detect per-shift pay and include more vacancies
+      url.searchParams.set('include_description', 'true');
       url.searchParams.set('fetch_all', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load hourly stats');
@@ -308,6 +310,8 @@
       if (area != null && area !== '') url.searchParams.set('area', String(area));
       url.searchParams.set('per_page', '100');
       url.searchParams.set('simplified', 'true');
+      // Include descriptions to capture per-shift monthly estimates
+      url.searchParams.set('include_description', 'true');
       url.searchParams.set('fetch_all', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load hourly items');
@@ -386,8 +390,10 @@
       `;
       const rows = list.map(({ label, stats, totalCount }) => {
         const s = stats || {};
-        const countText = (typeof totalCount === 'number' && totalCount > 0)
-          ? `${totalCount} ${pluralizeVacancies(totalCount)}`
+        // Show the number of vacancies actually included in stats after validation/filtering
+        const included = (typeof s.count === 'number' ? s.count : 0);
+        const countText = (included > 0)
+          ? `${included} ${pluralizeVacancies(included)}`
           : '—';
         return `
           <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; align-items:center;">
@@ -413,6 +419,8 @@
       url.searchParams.set('simplified', 'true');
       // employer_mark not required for region-level aggregation, but harmless
       url.searchParams.set('employer_mark', 'false');
+      // Include descriptions so per-shift posts get monthly estimates
+      url.searchParams.set('include_description', 'true');
       url.searchParams.set('fetch_all', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load data');
