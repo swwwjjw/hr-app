@@ -216,13 +216,13 @@
           return n.includes('ржд') || (n.includes('российск') && n.includes('железн') && n.includes('дорог'));
         },
       },
-      {
-        label: 'Аэропорт Пулково',
-        match: (raw) => {
-          const n = normalizeName(raw);
-          return n.includes('аэропорт') && n.includes('пулково');
-        },
-      },
+      // {
+      //   label: 'Аэропорт Пулково',
+      //   match: (raw) => {
+      //     const n = normalizeName(raw);
+      //     return n.includes('аэропорт') && n.includes('пулково');
+      //   },
+      // },
       {
         label: 'АО Авиакомпания Россия',
         match: (raw) => {
