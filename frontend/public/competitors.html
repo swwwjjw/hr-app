@@ -193,15 +193,62 @@
       return 'вакансиях';
     }
 
-    // Companies to display using employer IDs from hh.ru
-    // Mirrors backend EMPLOYER_IDS mapping for consistency
-    const EMPLOYER_IDS = [
-      { label: 'Аэропорт Пулково', id: '666661' },
-      { label: 'Авиакомпания Россия', id: '125493' },
-      { label: 'Петербургский Метрополитен', id: '218800' },
-      { label: 'РЖД', id: '23427' },
-      { label: 'Теремок - Русские Блины', id: '53742' },
+    // Companies/groups to display. Each group may include multiple employer IDs
+    // and name patterns to capture subsidiaries/alternate namings.
+    const EMPLOYER_GROUPS = [
+      {
+        label: 'Аэропорт Пулково',
+        ids: ['666661'],
+        nameIncludes: ['Аэропорт Пулково', 'Воздушные Ворота Северной Столицы']
+      },
+      {
+        label: 'Авиакомпания Россия',
+        ids: ['125493'],
+        nameIncludes: ['Авиакомпания Россия']
+      },
+      {
+        label: 'Петербургский Метрополитен',
+        ids: ['218800'],
+        nameIncludes: ['Петербургский Метрополитен', 'Метрополитен Санкт-Петербург']
+      },
+      {
+        label: 'РЖД',
+        ids: ['23427'],
+        // Include common subsidiaries/aliases so stats reflect the whole company group
+        nameIncludes: [
+          'РЖД',
+          'Российские железные дороги',
+          'РЖД Логистика',
+          'РЖД-Здоровье',
+          'Федеральная пассажирская компания',
+          'ФПК'
+        ]
+      },
+      {
+        label: 'Теремок - Русские Блины',
+        ids: ['53742'],
+        nameIncludes: ['Теремок', 'Русские Блины']
+      }
     ];
+
+    function normalizeEmployerName(name) {
+      return (name || '')
+        .toString()
+        .toLowerCase()
+        .replace(/[«»"'`]/g, '')
+        .replace(/[\.,]/g, ' ')
+        .replace(/\b(ооо|оао|пао|зао|ao|oao|zao)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function matchesEmployerGroup(v, group) {
+      const id = String(v?.employer_id || '');
+      if (Array.isArray(group.ids) && group.ids.some((x) => String(x) === id)) return true;
+      const name = normalizeEmployerName(v?.employer_name || '');
+      const pats = (group.nameIncludes || []).map(normalizeEmployerName).filter(Boolean);
+      return pats.some((p) => p && name.includes(p));
+    }
 
     function computeHourlyStats(items) {
       const HOURS_PER_MONTH = 164.0;
@@ -263,13 +310,12 @@
     }
 
     function computeCompanyHourlyStats(items) {
-      // Returns array of { label, stats, totalCount } using strict employer IDs
-      return EMPLOYER_IDS.map((c) => {
-        const subset = (items || []).filter(
-          (v) => String(v?.employer_id || '') === String(c.id)
-        );
+      // Returns array of { label, stats, totalCount, usedCount } using IDs and name patterns
+      return EMPLOYER_GROUPS.map((g) => {
+        const subset = (items || []).filter((v) => matchesEmployerGroup(v, g));
         const stats = computeHourlyStats(subset);
-        return { label: c.label, stats, totalCount: subset.length };
+        const usedCount = typeof stats.count === 'number' ? stats.count : 0;
+        return { label: g.label, stats, totalCount: subset.length, usedCount };
       });
     }
 
@@ -384,11 +430,17 @@
           <div style="text-align:right;">Основано на</div>
         </div>
       `;
-      const rows = list.map(({ label, stats, totalCount }) => {
+      const rows = list.map(({ label, stats, totalCount, usedCount }) => {
         const s = stats || {};
-        const countText = (typeof totalCount === 'number' && totalCount > 0)
-          ? `${totalCount} ${pluralizeVacancies(totalCount)}`
-          : '—';
+        const u = typeof usedCount === 'number' ? usedCount : 0;
+        let countText = '—';
+        if (u > 0) {
+          if (typeof totalCount === 'number' && totalCount > u) {
+            countText = `${u} из ${totalCount} ${pluralizeVacancies(u)}`;
+          } else {
+            countText = `${u} ${pluralizeVacancies(u)}`;
+          }
+        }
         return `
           <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; align-items:center;">
             <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${label}</span></div>
