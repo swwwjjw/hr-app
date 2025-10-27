@@ -381,10 +381,14 @@
           <div>Медиана</div>
           <div>Средняя</div>
           <div>Макс</div>
+          <div style="text-align:right;">Основано на</div>
         </div>
       `;
       const rows = list.map(({ label, stats, totalCount }) => {
         const s = stats || {};
+        const countText = (typeof totalCount === 'number' && totalCount > 0)
+          ? `${totalCount} ${pluralizeVacancies(totalCount)}`
+          : '—';
         return `
           <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 0.8fr; gap:10px; align-items:center;">
             <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${label}</span></div>
@@ -392,6 +396,7 @@
             <div>${fmtHourly(s.median)}</div>
             <div>${fmtHourly(s.avg)}</div>
             <div>${fmtHourly(s.max)}</div>
+            <div style="text-align:right; color:#cbd5e1; font-size:12px;">${countText}</div>
           </div>
         `;
       }).join('');
