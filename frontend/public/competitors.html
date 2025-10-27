@@ -193,50 +193,14 @@
       return 'вакансиях';
     }
 
-    // Normalize employer name for robust matching
-    function normalizeName(name) {
-      return (name || '')
-        .toString()
-        .toLowerCase()
-    }
-
-    // Companies to display with matching rules
-    const COMPANY_MATCHERS = [
-      {
-        label: 'Петербургский Метрополитен, государственное унитарное предприятие',
-        match: (raw) => {
-          const n = normalizeName(raw);
-          return n.includes('петербургский') && n.includes('метрополитен');
-        },
-      },
-      {
-        label: 'ОАО Российские железные дороги',
-        match: (raw) => {
-          const n = normalizeName(raw);
-          return n.includes('ржд') || ((n.includes('российские') && n.includes('железные') && n.includes('дороги')));
-        },
-      },
-      // {
-      //   label: 'Аэропорт Пулково',
-      //   match: (raw) => {
-      //     const n = normalizeName(raw);
-      //     return n.includes('аэропорт') && n.includes('пулково');
-      //   },
-      // },
-      {
-        label: 'АО Авиакомпания Россия',
-        match: (raw) => {
-          const n = normalizeName(raw);
-          return n.includes('авиакомпания') && n.includes('россия');
-        },
-      },
-      {
-        label: 'Теремок',
-        match: (raw) => {
-          const n = normalizeName(raw);
-          return n.includes('теремок');
-        },
-      },
+    // Companies to display using employer IDs from hh.ru
+    // Mirrors backend EMPLOYER_IDS mapping for consistency
+    const EMPLOYER_IDS = [
+      { label: 'Аэропорт Пулково', id: '666661' },
+      { label: 'Авиакомпания Россия', id: '125493' },
+      { label: 'Петербургский Метрополитен', id: '218800' },
+      { label: 'РЖД', id: '23427' },
+      { label: 'Теремок - Русские Блины', id: '53742' },
     ];
 
     function computeHourlyStats(items) {
@@ -299,11 +263,13 @@
     }
 
     function computeCompanyHourlyStats(items) {
-      // Returns array of { label, stats, totalCount }
-      return COMPANY_MATCHERS.map((m) => {
-        const subset = (items || []).filter((v) => m.match(v?.employer_name || ''));
+      // Returns array of { label, stats, totalCount } using strict employer IDs
+      return EMPLOYER_IDS.map((c) => {
+        const subset = (items || []).filter(
+          (v) => String(v?.employer_id || '') === String(c.id)
+        );
         const stats = computeHourlyStats(subset);
-        return { label: m.label, stats, totalCount: subset.length };
+        return { label: c.label, stats, totalCount: subset.length };
       });
     }
 
