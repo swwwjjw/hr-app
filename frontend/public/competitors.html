@@ -290,7 +290,6 @@
       url.searchParams.set('per_page', '100');
       url.searchParams.set('simplified', 'true');
       url.searchParams.set('fetch_all', 'true');
-      url.searchParams.set('include_description', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load hourly stats');
       const data = await res.json();
@@ -310,7 +309,6 @@
       url.searchParams.set('per_page', '100');
       url.searchParams.set('simplified', 'true');
       url.searchParams.set('fetch_all', 'true');
-      url.searchParams.set('include_description', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load hourly items');
       const data = await res.json();
@@ -416,7 +414,6 @@
       // employer_mark not required for region-level aggregation, but harmless
       url.searchParams.set('employer_mark', 'false');
       url.searchParams.set('fetch_all', 'true');
-      url.searchParams.set('include_description', 'true');
       const res = await fetch(url.toString());
       if (!res.ok) throw new Error('Failed to load data');
       const data = await res.json();
