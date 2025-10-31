@@ -119,6 +119,31 @@
       font-weight: 600;
       font-size: 12px;
     }
+    .placeholderTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .placeholderTable th,
+    .placeholderTable td {
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 10px;
+      text-align: center;
+    }
+    .placeholderTable th {
+      background: rgba(59, 130, 246, 0.15);
+      color: #e2e8f0;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .placeholderTable td {
+      color: #f8fafc;
+    }
+    .placeholderTable tbody tr:nth-child(even) td {
+      background: rgba(15, 23, 42, 0.35);
+    }
   </style>
 </head>
 <body>
@@ -346,25 +371,6 @@
       { value: 'безопасность досмотр', label: 'Инспекторы по досмотру' },
     ];
 
-    async function fetchRoleHourlyFromApi(query, area) {
-      // Fetch raw vacancies to compute hourly stats locally with the same outlier filtering
-      const url = new URL(window.location.origin + '/api/fetch');
-      url.searchParams.set('query', query || '');
-      if (area != null && area !== '') url.searchParams.set('area', String(area));
-      url.searchParams.set('per_page', '100');
-      url.searchParams.set('simplified', 'true');
-      url.searchParams.set('fetch_all', 'true');
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error('Failed to load hourly stats');
-      const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
-      return {
-        label: query,
-        hourly: computeHourlyStats(items),
-        totalCount: Array.isArray(items) ? items.length : null,
-      };
-    }
-
     // Fetch raw items for a specific role (used to build combined hourly stats for the five roles)
     async function fetchRoleItemsFromApi(query, area) {
       const url = new URL(window.location.origin + '/api/fetch');
@@ -379,56 +385,29 @@
       return Array.isArray(data?.items) ? data.items : [];
     }
 
-    function renderRoleHourly(list) {
+    function renderRoleHourly() {
       const container = document.getElementById('roleHourlyContainer');
       if (!container) return;
-      if (!Array.isArray(list) || list.length === 0) {
-        container.innerHTML = '<div class="meta">Недостаточно данных</div>';
-        return;
+      const columns = 4;
+      const rows = 16;
+      let table = '<table class="placeholderTable"><thead><tr>';
+      for (let c = 0; c < columns; c += 1) {
+        table += '<th>head</th>';
       }
-      const head = `
-        <div style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 1fr; gap:10px; padding:6px 8px; color:#cbd5e1; font-weight:600; font-size:12px;">
-          <div>Вакансия</div>
-          <div>Мин</div>
-          <div>Медиана</div>
-          <div>Средняя</div>
-          <div>Макс</div>
-          <div style="text-align:right;">Основано на</div>
-        </div>
-      `;
-      const rows = list.map((it) => {
-        const s = it?.hourly || {};
-        const label = (ROLE_PRESETS.find(p => p.value === it.label)?.label) || it.label || '';
-        const countText = (typeof s.count === 'number' && s.count > 0)
-          ? `${s.count} ${pluralizeVacancies(s.count)}`
-          : '—';
-        return `
-          <div class="miniCard" style="display:grid; grid-template-columns: 2fr repeat(4, minmax(0,1fr)) 1fr; gap:10px; align-items:center;">
-            <div><span class="badge" style="background: linear-gradient(135deg, #64748b, #94a3b8);">${label}</span></div>
-            <div>${fmtHourly(s.min)}</div>
-            <div>${fmtHourly(s.median)}</div>
-            <div>${fmtHourly(s.avg)}</div>
-            <div>${fmtHourly(s.max)}</div>
-            <div style="text-align:right; color:#cbd5e1; font-size:12px;">${countText}</div>
-          </div>
-        `;
-      }).join('');
-      container.innerHTML = head + rows;
+      table += '</tr></thead><tbody>';
+      for (let r = 0; r < rows; r += 1) {
+        table += '<tr>';
+        for (let c = 0; c < columns; c += 1) {
+          table += '<td>value</td>';
+        }
+        table += '</tr>';
+      }
+      table += '</tbody></table>';
+      container.innerHTML = table;
     }
 
-    async function loadRoleHourly(area) {
-      const container = document.getElementById('roleHourlyContainer');
-      if (container) container.innerHTML = '<div class="meta">Загрузка...</div>';
-      try {
-        const results = await Promise.all(
-          ROLE_PRESETS.map(p => fetchRoleHourlyFromApi(p.value, area))
-        );
-        // Sort by preset order (already preserved by map)
-        renderRoleHourly(results);
-      } catch (e) {
-        if (container) container.innerHTML = '<div class="meta">Не удалось загрузить данные</div>';
-        console.warn('Failed to load role hourly stats:', e);
-      }
+    async function loadRoleHourly() {
+      renderRoleHourly();
     }
 
     function renderCompanyHourly(list) {
@@ -561,11 +540,11 @@
           })();
           renderHourly(computeHourlyStats(mergedRoleItems));
           // Regional hourly stats for specific roles
-          await loadRoleHourly(selectedArea);
+          await loadRoleHourly();
           renderCompanyHourly(computeCompanyHourlyStats(cachedItems));
         } catch (e) {
           renderHourly({ count: 0 });
-          renderRoleHourly([]);
+          renderRoleHourly();
           renderCompanyHourly([]);
           console.warn('Failed to load competitors:', e);
         }
