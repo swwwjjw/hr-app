@@ -391,7 +391,7 @@
       const columns = 5;
       const rows = 16;
       let table = '<table class="placeholderTable"><thead><tr>';
-      heads = ["Название компании", "Почасовая ставка", "Минимальная зарплата", "Максимальная зарплата", "Средний ЧТС"]
+      heads = ["Название компании", "ЧТС", "Средний ЧТС", "Минимальная зарплата", "Максимальная зарплата"]
       for (let c = 0; c < columns; c += 1) {
         table += `<th>${heads[c]}</th>`;
       }
@@ -414,9 +414,11 @@
       ["Теремок", "240",	"9600",	"83640",	"375"]]
       for (let r = 0; r < rows - 1; r += 1) {
         table += '<tr>';
-        for (let c = 0; c < columns; c += 1) {
-          table += `<td>${data[r][c]}</td>`;
-        }
+        table += `<td>${data[r][0]}</td>`;
+        table += `<td>${data[r][1]}</td>`;
+        table += `<td>${data[r][4]}</td>`;
+        table += `<td>${data[r][2]}</td>`;
+        table += `<td>${data[r][3]}</td>`;
         table += '</tr>';
       }
       table += '</tbody></table>';
