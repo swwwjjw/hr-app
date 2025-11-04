@@ -588,149 +588,276 @@ let competitorHourlyChartInstance = null;
         requestAnimationFrame(() => renderCompetitorHourlyChart(data));
     }
 
-    async function loadRoleHourly() {
-      renderRoleHourly();
-    }
-
-      function parseHourlyFromTable(value) {
-        if (value == null) return null;
-        const normalized = String(value).replace(/[^0-9.,-]/g, '').replace(',', '.');
-        if (!normalized) return null;
-        const parsed = Number(normalized);
-        return Number.isFinite(parsed) ? parsed : null;
+      async function loadRoleHourly() {
+        renderRoleHourly();
       }
 
-      function renderCompetitorHourlyChart(rows) {
-        if (typeof Chart === 'undefined') return;
-        const canvas = document.getElementById('competitorHourlyChart');
-        const wrapper = document.getElementById('competitorHourlyChartWrapper');
-        if (!canvas || !wrapper) return;
-
-        const labels = [];
-        const values = [];
-        for (const row of rows || []) {
-          const name = row?.[0];
-          const hourlyValue = parseHourlyFromTable(row?.[1]);
-          if (!name || hourlyValue === null) continue;
-          labels.push(name);
-          values.push(hourlyValue);
+        function parseHourlyFromTable(value) {
+          if (value == null) return null;
+          const normalized = String(value).replace(/[^0-9.,-]/g, '').replace(',', '.');
+          if (!normalized) return null;
+          const parsed = Number(normalized);
+          return Number.isFinite(parsed) ? parsed : null;
         }
 
-        if (!labels.length) {
-          wrapper.innerHTML = '<div class="meta" style="padding:24px;">Недостаточно данных для диаграммы</div>';
-          return;
+        const COMPETITOR_HOURLY_GROUPS = [
+          { label: '400-350', min: 350, max: 400 },
+          { label: '340-300', min: 300, max: 340 },
+          { label: '290-250', min: 250, max: 290 },
+          { label: '240-200', min: 200, max: 240 }
+        ];
+
+        const COMPETITOR_GROUP_COLORS = {
+          '400-350': { background: 'rgba(59, 130, 246, 0.85)', border: 'rgba(59, 130, 246, 1)' },
+          '340-300': { background: 'rgba(99, 102, 241, 0.82)', border: 'rgba(99, 102, 241, 1)' },
+          '290-250': { background: 'rgba(129, 140, 248, 0.82)', border: 'rgba(129, 140, 248, 1)' },
+          '240-200': { background: 'rgba(165, 180, 252, 0.82)', border: 'rgba(165, 180, 252, 1)' }
+        };
+
+        const DEFAULT_GROUP_COLOR = { background: 'rgba(51, 122, 255, 0.82)', border: 'rgba(51, 122, 255, 1)' };
+
+        function buildCompetitorHourlyGroups(rows) {
+          const rangeBuckets = COMPETITOR_HOURLY_GROUPS.map((range) => ({ ...range, items: [] }));
+          const fallbackBucket = { label: 'Вне диапазона', items: [] };
+
+          for (const row of rows || []) {
+            const name = row?.[0];
+            const hourlyValue = parseHourlyFromTable(row?.[1]);
+            if (!name || hourlyValue === null) continue;
+            const bucket = rangeBuckets.find((range) => hourlyValue <= range.max && hourlyValue >= range.min) || fallbackBucket;
+            bucket.items.push({ label: name, value: hourlyValue });
+          }
+
+          const labels = [];
+          const values = [];
+          const groupLabels = [];
+          const groupMeta = [];
+
+          let currentIndex = 0;
+          for (const bucket of rangeBuckets) {
+            if (!bucket.items.length) continue;
+            const startIndex = currentIndex;
+            for (const item of bucket.items) {
+              labels.push(item.label);
+              values.push(item.value);
+              groupLabels.push(bucket.label);
+              currentIndex += 1;
+            }
+            groupMeta.push({ label: bucket.label, startIndex, endIndex: currentIndex - 1 });
+          }
+
+          if (fallbackBucket.items.length) {
+            const startIndex = currentIndex;
+            for (const item of fallbackBucket.items) {
+              labels.push(item.label);
+              values.push(item.value);
+              groupLabels.push(fallbackBucket.label);
+              currentIndex += 1;
+            }
+            groupMeta.push({ label: fallbackBucket.label, startIndex, endIndex: currentIndex - 1 });
+          }
+
+          return { labels, values, groupLabels, groupMeta };
         }
 
-        const maxValue = Math.max(...values);
-        const backgroundColor = values.map((v) => (v === maxValue ? 'rgba(6, 182, 212, 0.9)' : 'rgba(59, 130, 246, 0.8)'));
-        const borderColor = values.map((v) => (v === maxValue ? 'rgba(6, 182, 212, 1)' : 'rgba(59, 130, 246, 1)'));
-        const borderWidth = values.map((v) => (v === maxValue ? 3 : 1));
+        function renderCompetitorHourlyChart(rows) {
+          if (typeof Chart === 'undefined') return;
+          const canvas = document.getElementById('competitorHourlyChart');
+          const wrapper = document.getElementById('competitorHourlyChartWrapper');
+          if (!canvas || !wrapper) return;
 
-        if (competitorHourlyChartInstance) {
-          competitorHourlyChartInstance.destroy();
-        }
+          const groupedData = buildCompetitorHourlyGroups(rows);
+          const { labels, values, groupLabels, groupMeta } = groupedData;
 
-        competitorHourlyChartInstance = new Chart(canvas, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: 'ЧТС, ₽/ч',
-                data: values,
-                backgroundColor,
-                borderColor,
-                borderWidth,
-                borderRadius: 6,
-                maxBarThickness: 52
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-              padding: {
-                top: 12,
-                bottom: 12,
-                left: 8,
-                right: 8
-              }
-            },
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                titleColor: '#ffffff',
-                bodyColor: '#cbd5e1',
-                borderColor: 'rgba(59, 130, 246, 0.5)',
-                borderWidth: 1,
-                padding: 12,
-                displayColors: false,
-                callbacks: {
-                  title: (context) => context[0]?.label || '',
-                  label: (context) => `ЧТС: ${Math.round(context.parsed.y).toLocaleString('ru-RU')} ₽/ч`
+          if (!labels.length) {
+            wrapper.innerHTML = '<div class="meta" style="padding:24px;">Недостаточно данных для диаграммы</div>';
+            return;
+          }
+
+          const maxValue = Math.max(...values);
+          const backgroundColor = values.map((v, index) => {
+            if (v === maxValue) return 'rgba(6, 182, 212, 0.92)';
+            const palette = COMPETITOR_GROUP_COLORS[groupLabels[index]] || DEFAULT_GROUP_COLOR;
+            return palette.background;
+          });
+          const borderColor = values.map((v, index) => {
+            if (v === maxValue) return 'rgba(6, 182, 212, 1)';
+            const palette = COMPETITOR_GROUP_COLORS[groupLabels[index]] || DEFAULT_GROUP_COLOR;
+            return palette.border;
+          });
+          const borderWidth = values.map((v) => (v === maxValue ? 3 : 1));
+
+          const groupLabelPlugin = {
+            id: 'competitorGroupLabels',
+            afterDatasetsDraw(chart) {
+              const pluginOptions = chart.options?.plugins?.competitorGroupLabels;
+              if (!pluginOptions?.groups?.length) return;
+              const datasetMeta = chart.getDatasetMeta(0);
+              const elements = datasetMeta?.data;
+              if (!elements?.length) return;
+              const ctx = chart.ctx;
+              const bottom = chart.chartArea.bottom;
+              const lineOffset = pluginOptions.lineOffset ?? 10;
+              const labelOffset = pluginOptions.labelOffset ?? 18;
+              const lineY = bottom + lineOffset;
+
+              ctx.save();
+              ctx.strokeStyle = pluginOptions.lineColor || 'rgba(148, 163, 184, 0.6)';
+              ctx.lineWidth = pluginOptions.lineWidth ?? 1;
+              ctx.font = pluginOptions.font || '600 11px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+              ctx.fillStyle = pluginOptions.color || '#94a3b8';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+
+              for (const group of pluginOptions.groups) {
+                const firstBar = elements[group.startIndex];
+                const lastBar = elements[group.endIndex];
+                if (!firstBar || !lastBar) continue;
+                const left = firstBar.x - (firstBar.width ?? 0) / 2;
+                const right = lastBar.x + (lastBar.width ?? 0) / 2;
+                const center = (left + right) / 2;
+                const capHeight = pluginOptions.capHeight ?? 6;
+
+                ctx.beginPath();
+                ctx.moveTo(left, lineY);
+                ctx.lineTo(right, lineY);
+                if (capHeight > 0) {
+                  ctx.moveTo(left, lineY);
+                  ctx.lineTo(left, lineY - capHeight);
+                  ctx.moveTo(right, lineY);
+                  ctx.lineTo(right, lineY - capHeight);
                 }
+                ctx.stroke();
+
+                ctx.fillText(group.label, center, lineY + labelOffset);
               }
+
+              ctx.restore();
+            }
+          };
+
+          if (competitorHourlyChartInstance) {
+            competitorHourlyChartInstance.destroy();
+          }
+
+          competitorHourlyChartInstance = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'ЧТС, ₽/ч',
+                  data: values,
+                  backgroundColor,
+                  borderColor,
+                  borderWidth,
+                  borderRadius: 6,
+                  maxBarThickness: 52
+                }
+              ]
             },
-            animation: {
-              onComplete: () => {
-                const chart = Chart.getChart(canvas);
-                if (!chart) return;
-                const ctx = chart.ctx;
-                chart.data.datasets.forEach((dataset, dataSetIndex) => {
-                  const meta = chart.getDatasetMeta(dataSetIndex);
-                  meta.data.forEach((element, index) => {
-                    const value = dataset.data[index];
-                    if (!value) return;
-                    const { x, y } = element;
-                    ctx.save();
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    ctx.shadowColor = 'rgba(15, 23, 42, 0.6)';
-                    ctx.shadowBlur = 4;
-                    ctx.fillText(`${Math.round(value).toLocaleString('ru-RU')} ₽/ч`, x, y - 6);
-                    ctx.restore();
-                  });
-                });
-              }
-            },
-            scales: {
-              x: {
-                grid: {
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: {
+                padding: {
+                  top: 12,
+                  bottom: 54,
+                  left: 8,
+                  right: 8
+                }
+              },
+              plugins: {
+                competitorGroupLabels: {
+                  groups: groupMeta,
+                  lineOffset: 10,
+                  labelOffset: 6,
+                  capHeight: 8,
+                  color: '#cbd5e1',
+                  lineColor: 'rgba(148, 163, 184, 0.4)'
+                },
+                legend: {
                   display: false
                 },
-                ticks: {
-                  color: '#cbd5e1',
-                  font: {
-                    size: 11,
-                    weight: '500'
+                tooltip: {
+                  backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                  titleColor: '#ffffff',
+                  bodyColor: '#cbd5e1',
+                  borderColor: 'rgba(59, 130, 246, 0.5)',
+                  borderWidth: 1,
+                  padding: 12,
+                  displayColors: false,
+                  callbacks: {
+                    title: (context) => context[0]?.label || '',
+                    label: (context) => `ЧТС: ${Math.round(context.parsed.y).toLocaleString('ru-RU')} ₽/ч`,
+                    afterLabel: (context) => {
+                      const index = context.dataIndex;
+                      const groupLabel = groupLabels?.[index];
+                      return groupLabel ? `Диапазон: ${groupLabel} ₽/ч` : undefined;
+                    }
                   }
                 }
               },
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: 'rgba(148, 163, 184, 0.15)',
-                  lineWidth: 1
-                },
-                ticks: {
-                  color: '#cbd5e1',
-                  font: {
-                    size: 11,
-                    weight: '400'
+              animation: {
+                onComplete: () => {
+                  const chart = Chart.getChart(canvas);
+                  if (!chart) return;
+                  const ctx = chart.ctx;
+                  chart.data.datasets.forEach((dataset, dataSetIndex) => {
+                    const meta = chart.getDatasetMeta(dataSetIndex);
+                    meta.data.forEach((element, index) => {
+                      const value = dataset.data[index];
+                      if (!value) return;
+                      const { x, y } = element;
+                      ctx.save();
+                      ctx.fillStyle = '#ffffff';
+                      ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'bottom';
+                      ctx.shadowColor = 'rgba(15, 23, 42, 0.6)';
+                      ctx.shadowBlur = 4;
+                      ctx.fillText(`${Math.round(value).toLocaleString('ru-RU')} ₽/ч`, x, y - 6);
+                      ctx.restore();
+                    });
+                  });
+                }
+              },
+              scales: {
+                x: {
+                  offset: true,
+                  grid: {
+                    display: false
                   },
-                  callback: (value) => `${value} ₽/ч`
+                  ticks: {
+                    color: '#cbd5e1',
+                    font: {
+                      size: 11,
+                      weight: '500'
+                    },
+                    maxRotation: 0,
+                    autoSkip: false
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    color: 'rgba(148, 163, 184, 0.15)',
+                    lineWidth: 1
+                  },
+                  ticks: {
+                    color: '#cbd5e1',
+                    font: {
+                      size: 11,
+                      weight: '400'
+                    },
+                    callback: (value) => `${value} ₽/ч`
+                  }
                 }
               }
-            }
-          }
-        });
-      }
+            },
+            plugins: [groupLabelPlugin]
+          });
+        }
 
     function renderCompanyHourly(list) {
       const container = document.getElementById('companyHourlyContainer');
