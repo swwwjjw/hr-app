@@ -144,6 +144,82 @@
     .placeholderTable tbody tr:nth-child(even) td {
       background: rgba(15, 23, 42, 0.35);
     }
+    .tooltipHeader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tooltipHeader span:first-child {
+      flex: 1;
+    }
+    .infoTooltip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.25);
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: help;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .infoTooltip:hover,
+    .infoTooltip:focus-visible {
+      background: rgba(59, 130, 246, 0.5);
+      color: #0f172a;
+    }
+    .infoTooltip:focus-visible {
+      outline: 2px solid rgba(59, 130, 246, 0.6);
+      outline-offset: 2px;
+    }
+    .infoTooltip .tooltipText {
+      position: absolute;
+      top: 30px;
+      right: 0;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 8px;
+      padding: 12px;
+      max-width: 320px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #e2e8f0;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.45);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 10;
+      text-align: left;
+      white-space: normal;
+    }
+    .infoTooltip .tooltipText::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      right: 14px;
+      width: 12px;
+      height: 12px;
+      background: rgba(15, 23, 42, 0.95);
+      border-left: 1px solid rgba(59, 130, 246, 0.4);
+      border-top: 1px solid rgba(59, 130, 246, 0.4);
+      transform: rotate(45deg);
+    }
+    .infoTooltip:hover .tooltipText,
+    .infoTooltip:focus-visible .tooltipText {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .tooltipList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -171,7 +247,13 @@
         <div class="meta" id="hourlyMeta">Недостаточно данных</div>
       </div>
       <div id="roleHourlyCard" style="margin-top:12px;">
-        <h3 style="margin-top:0;">ЧТС по конкурентам</h3>
+        <h3 style="margin-top:0;" class="tooltipHeader">
+          <span>ЧТС по конкурентам</span>
+          <span id="competitorsTooltip" class="infoTooltip" role="button" tabindex="0" aria-label="">
+            i
+            <span class="tooltipText"></span>
+          </span>
+        </h3>
         <div id="roleHourlyContainer">
           <div class="meta">Загрузка...</div>
         </div>
@@ -217,6 +299,14 @@
       if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'вакансии';
       return 'вакансиях';
     }
+
+    const COMPETITORS_TOOLTIP_LINES = [
+      'ЧТС - базовая часовая тарифная ставка;',
+      'Средняя ЧТС - среднее арифметическое из ЧТС по максимальной зарплате и ЧТС по минимальной зарплате;',
+      'Минимальная зарплата - зарплата за 40 часов работы в месяц;',
+      'Максимальная зарплата - зарплата за 164 часа работы в месяц + бонусы и надбавки;'
+    ];
+    const COMPETITORS_TOOLTIP_TITLE = COMPETИТORS_TOOLTIP_LINES.join(' &#10;');
 
     // Companies/groups to display. Each group may include multiple employer IDs
     // and name patterns to capture subsidiaries/alternate namings.
@@ -362,6 +452,17 @@
       });
     }
 
+    function applyCompetitorsTooltip() {
+      const tooltipRoot = document.getElementById('competitorsTooltip');
+      if (!tooltipRoot) return;
+      tooltipRoot.setAttribute('aria-label', COMPETITORS_TOOLTIP_LINES.join(' '));
+      tooltipRoot.setAttribute('title', COMPETITORS_TOOLTIP_LINES.join('\n'));
+      const tooltipContent = tooltipRoot.querySelector('.tooltipText');
+      if (tooltipContent) {
+        tooltipContent.innerHTML = `<div class="tooltipList">${COMPETITORS_TOOLTIP_LINES.map((line) => `<div>${line}</div>`).join('')}</div>`;
+      }
+    }
+
     // Vacancy presets for regional hourly stats
     const ROLE_PRESETS = [
       { value: 'уборщик клининг', label: 'Специалист СБОВС' },
@@ -388,37 +489,42 @@
     function renderRoleHourly() {
       const container = document.getElementById('roleHourlyContainer');
       if (!container) return;
-      const columns = 5;
-      const rows = 16;
-      let table = '<table class="placeholderTable"><thead><tr>';
-      heads = ["Название компании", "ЧТС", "Средний ЧТС", "Минимальная зарплата", "Максимальная зарплата"]
-      for (let c = 0; c < columns; c += 1) {
-        table += `<th>${heads[c]}</th>`;
+      const headers = [
+        'Название компании',
+        'ЧТС',
+        'Средняя ЧТС',
+        'Минимальная зарплата',
+        'Максимальная зарплата'
+      ];
+      const data = [
+        ['Яндекс Лавка', '400', '16000', '93808', '486'],
+        ['Яндекс Еда', '400', '16000', '101516', '510'],
+        ['Самокат', '350', '14000', '63140', '368'],
+        ['Яндекс Крауд', '350', '14000', '75440', '405'],
+        ['Т-Банк', '330', '13200', '65600', '365'],
+        ['Ozon', '320', '12800', '106600', '485'],
+        ['Улыбка радуги', '300', '12000', '49200', '300'],
+        ['Булочные Вольчека', '300', '12000', '49200', '300'],
+        ['Ростелеком', '280', '11200', '100000', '445'],
+        ['Burger King', '280', '11200', '98333', '440'],
+        ['Токио-сити', '260', '10400', '56666', '303'],
+        ['Додо пицца', '250', '10000', '41000', '250'],
+        ['ЛюдиЛюбят', '250', '10000', '50400', '279'],
+        ['Вкусно и точка', '250', '10000', '49200', '275'],
+        ['Теремок', '240', '9600', '83640', '375']
+      ];
+      let table = `<table class="placeholderTable" title="${COMPETITORS_TOOLTIP_TITLE}"><thead><tr>`;
+      for (const header of headers) {
+        table += `<th>${header}</th>`;
       }
       table += '</tr></thead><tbody>';
-      data = 
-      [["Яндекс Лавка",	"400",	"16000",	"93808",	"486"],
-      ["Яндекс Еда",	"400",	"16000",	"101516",	"510"],
-      ["Самокат",	"350", "14000",	"63140",	"368"],
-      ["Яндекс Крауд",	"350", "14000",	"75440",	"405"],
-      ["Т-Банк", "330", "13200", "65600", "365"],
-      ["Ozon",	"320", "12800",	"106600",	"485"],
-      ["Улыбка радуги",	"300",	"12000", "49200",	"300"],
-      ["Булочные Вольчека",	"300",	"12000",	"49200", "300"],
-      ["Ростелеком",	"280",	"11200",	"100000",	"445"],
-      ["Burger King",	"280",	"11200",	"98333",	"440"],
-      ["Токио-сити", "260",	"10400",	"56666", "303"],
-      ["Додо пицца",	"250",	"10000",	"41000",	"250"],
-      ["ЛюдиЛюбят",	"250",	"10000",	"50400",	"279"],
-      ["Вкусно и точка",	"250",	"10000",	"49200",	"275"],
-      ["Теремок", "240",	"9600",	"83640",	"375"]]
-      for (let r = 0; r < rows - 1; r += 1) {
+      for (const row of data) {
         table += '<tr>';
-        table += `<td>${data[r][0]}</td>`;
-        table += `<td>${data[r][1]}</td>`;
-        table += `<td>${data[r][4]}</td>`;
-        table += `<td>${data[r][2]}</td>`;
-        table += `<td>${data[r][3]}</td>`;
+        table += `<td>${row[0]}</td>`;
+        table += `<td>${row[1]}</td>`;
+        table += `<td>${row[4]}</td>`;
+        table += `<td>${row[2]}</td>`;
+        table += `<td>${row[3]}</td>`;
         table += '</tr>';
       }
       table += '</tbody></table>';
@@ -520,6 +626,7 @@
 
     (function init() {
       const ctx = getParams();
+      applyCompetitorsTooltip();
 
       document.getElementById('backBtn').addEventListener('click', () => {
         const { protocol, hostname } = window.location;
