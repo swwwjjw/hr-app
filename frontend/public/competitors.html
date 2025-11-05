@@ -607,12 +607,12 @@ let competitorHourlyChartInstance = null;
           { label: '240-200', min: 200, max: 240 }
         ];
 
-        const COMPETITOR_GROUP_COLORS = {
-          '400-350': { background: 'rgba(59, 130, 246, 0.85)', border: 'rgba(59, 130, 246, 1)' },
-          '340-300': { background: 'rgba(99, 102, 241, 0.82)', border: 'rgba(99, 102, 241, 1)' },
-          '290-250': { background: 'rgba(129, 140, 248, 0.82)', border: 'rgba(129, 140, 248, 1)' },
-          '240-200': { background: 'rgba(165, 180, 252, 0.82)', border: 'rgba(165, 180, 252, 1)' }
-        };
+          const COMPETITOR_GROUP_COLORS = {
+            '400-350': { background: 'rgba(59, 130, 246, 0.85)', border: 'rgba(59, 130, 246, 1)' },
+            '340-300': { background: 'rgba(99, 102, 241, 0.82)', border: 'rgba(99, 102, 241, 1)' },
+            '290-250': { background: '#00FFFF', border: '#00FFFF' },
+            '240-200': { background: 'rgba(165, 180, 252, 0.82)', border: 'rgba(165, 180, 252, 1)' }
+          };
 
         const DEFAULT_GROUP_COLOR = { background: 'rgba(51, 122, 255, 0.82)', border: 'rgba(51, 122, 255, 1)' };
 
@@ -673,8 +673,12 @@ let competitorHourlyChartInstance = null;
             return;
           }
 
-          const barBackgroundColor = 'rgba(59, 130, 246, 0.82)';
-          const barBorderColor = 'rgba(59, 130, 246, 1)';
+            const barBackgroundColor = labels.map((label) =>
+              (COMPETITOR_GROUP_COLORS[label] || DEFAULT_GROUP_COLOR).background
+            );
+            const barBorderColor = labels.map((label) =>
+              (COMPETITOR_GROUP_COLORS[label] || DEFAULT_GROUP_COLOR).border
+            );
 
           if (competitorHourlyChartInstance) {
             competitorHourlyChartInstance.destroy();
