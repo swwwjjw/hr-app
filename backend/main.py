@@ -589,10 +589,14 @@ async def dashboard():
       <!-- <option value="инспектор перрон">Инспектор перронного контроля</option> -->
       <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
       <option value="врач терапевт">Врач-терапевт</option>
-              <!-- <option value="грузчик склад">Грузчик</option> -->
+              <option value="грузчик нагрузки">Грузчик</option>
               <option value="водитель категория D">Водитель</option>
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
               <option value="уборщик клининг">Специалист СБОВС</option>
+              <option value="мойщик посуды">Мойщик-уборщик</option>
+              <option value="ML инженер">ML-инженер</option>
+              <option value="Аналитик данных SQL">Аналитик данных</option>
+              <option value="машинист катка">Машинист катка</option>
     </select>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
@@ -750,13 +754,24 @@ async def dashboard():
         'безопасность досмотр': 'безопасность досмотр', 
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
+        'грузчик нагрузки': 'грузчик нагрузки',
         'грузчик склад': 'грузчик склад',
-        'грузчик': 'грузчик склад',
+        'грузчик': 'грузчик нагрузки',
         'водитель категория С': 'водитель категория С',
         'водитель категория D': 'водитель категория D',
         'водитель': 'водитель категория D',
         'уборщик клининг': 'уборщик клининг',
-        'уборщик': 'уборщик клининг'
+        'уборщик': 'уборщик клининг',
+        'мойщик посуды': 'мойщик посуды',
+        'мойщик-уборщик': 'мойщик посуды',
+        'мойщик': 'мойщик посуды',
+        'ml инженер': 'ML инженер',
+        'ml-инженер': 'ML инженер',
+        'ml engineer': 'ML инженер',
+        'аналитик данных sql': 'Аналитик данных SQL',
+        'аналитик данных': 'Аналитик данных SQL',
+        'data analyst sql': 'Аналитик данных SQL',
+        'машинист катка': 'машинист катка'
       };
       
       // Find matching preset
@@ -1133,19 +1148,6 @@ async def dashboard():
       
       // Add specific vacancies for специалист сбовс
       if (query && (query.toLowerCase().includes('специалист сбовс') || query.toLowerCase().includes('уборщик клининг'))) {
-        // Add Авиакомпания Победа vacancy
-        const pobedaVacancy = {
-          x: 69000, // Average of 64,000-74,000 range
-          y: 3.4, // Employer rating for Авиакомпания Победа
-          r: 12, // Same size as Pulkovo bubbles
-          title: 'Специалист по уборке ВС',
-          employer: 'Авиакомпания Победа',
-          isPulkovo: false,
-          isPobeda: true
-        };
-        points.push(pobedaVacancy);
-        console.log('Added Pobeda vacancy:', pobedaVacancy);
-        
         // Add Теремок vacancy
         const teremokVacancy = {
           x: 87500, // Average of 80,000-95,000 range
@@ -1173,6 +1175,190 @@ async def dashboard():
         };
         points.push(ozonVacancy);
         console.log('Added Ozon vacancy:', ozonVacancy);
+      }
+      
+      // Add specific vacancies for грузчик нагрузки
+      if (query && query.toLowerCase().includes('грузчик нагрузки')) {
+        // Почта России - https://spb.hh.ru/vacancy/123637422
+        const pochtaVacancy = {
+          x: 61000, // Salary from https://spb.hh.ru/vacancy/123637422
+          y: 3.5, // Employer rating for Почта России
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Грузчик',
+          employer: 'Почта России',
+          isPulkovo: false,
+          isPochta: true
+        };
+        points.push(pochtaVacancy);
+        console.log('Added Почта России vacancy:', pochtaVacancy);
+        
+        // Магнит - https://spb.hh.ru/vacancy/127281337
+        const magnitVacancy = {
+          x: 104000, // Salary from https://spb.hh.ru/vacancy/127281337
+          y: 3.8, // Employer rating for Магнит
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Грузчик',
+          employer: 'Магнит',
+          isPulkovo: false,
+          isMagnit: true
+        };
+        points.push(magnitVacancy);
+        console.log('Added Магнит vacancy:', magnitVacancy);
+        
+        // DNS - https://spb.hh.ru/vacancy/121166330
+        const dnsVacancy = {
+          x: 110000, // Salary from https://spb.hh.ru/vacancy/121166330
+          y: 3.6, // Employer rating for DNS
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Грузчик',
+          employer: 'DNS',
+          isPulkovo: false,
+          isDNS: true
+        };
+        points.push(dnsVacancy);
+        console.log('Added DNS vacancy:', dnsVacancy);
+      }
+      
+      // Add specific vacancies for мойщик посуды
+      if (query && query.toLowerCase().includes('мойщик посуды')) {
+        // Токио-сити - https://spb.hh.ru/vacancy/114964025
+        const tokyoSitiVacancy = {
+          x: 75000, // Average of 65,000-85,000 range from https://spb.hh.ru/vacancy/114964025
+          y: 4.1, // Company rating for ТОКИО-CITY
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Мойщик посуды',
+          employer: 'Токио-сити',
+          isPulkovo: false,
+          isTokyoSiti: true
+        };
+        points.push(tokyoSitiVacancy);
+        console.log('Added Токио-сити vacancy:', tokyoSitiVacancy);
+        
+        // Бона Капона - https://spb.hh.ru/vacancy/126795069
+        const bonaKaponaVacancy = {
+          x: 78000, // Average of 73,000-83,000 range from https://spb.hh.ru/vacancy/126795069
+          y: 4.0, // Company rating for Bona People Group
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Мойщик посуды',
+          employer: 'Бона Капона',
+          isPulkovo: false,
+          isBonaKapona: true
+        };
+        points.push(bonaKaponaVacancy);
+        console.log('Added Бона Капона vacancy:', bonaKaponaVacancy);
+        
+        // DelMar - https://spb.hh.ru/vacancy/126087218
+        const delmarVacancy = {
+          x: 85000, // Average of 80,000-90,000 range from https://spb.hh.ru/vacancy/126087218
+          y: 3.7, // Company rating for Del Mar
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Мойщик посуды',
+          employer: 'DelMar',
+          isPulkovo: false,
+          isDelMar: true
+        };
+        points.push(delmarVacancy);
+        console.log('Added DelMar vacancy:', delmarVacancy);
+        
+        // Ginza - https://spb.hh.ru/vacancy/126629566
+        const ginzaVacancy = {
+          x: 84000, // Salary from https://spb.hh.ru/vacancy/126629566
+          y: 3.4, // Company rating for Ginza Project
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Мойщик посуды',
+          employer: 'Ginza',
+          isPulkovo: false,
+          isGinza: true
+        };
+        points.push(ginzaVacancy);
+        console.log('Added Ginza vacancy:', ginzaVacancy);
+      }
+      
+      // Add specific vacancies for ML инженер
+      if (query && query.toLowerCase().includes('ml инженер')) {
+        // Радиофид - ML Engineer / Инженер машинного обучения
+        const radiofidVacancy = {
+          x: 130000, // Salary от 130,000 ₽/мес
+          y: 4.7, // Company rating 4.7★
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'ML Engineer / Инженер машинного обучения',
+          employer: 'Радиофид',
+          isPulkovo: false,
+          isRadiofid: true
+        };
+        points.push(radiofidVacancy);
+        console.log('Added Радиофид vacancy:', radiofidVacancy);
+      }
+      
+      // Add specific vacancies for аналитик данных sql
+      if (query && query.toLowerCase().includes('аналитик данных sql')) {
+        // ООО Горбилет - Продуктовый аналитик
+        const gorbiletVacancy = {
+          x: 200000, // Salary from 200,000 ₽
+          y: 4.5, // Company rating 4.5
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Продуктовый аналитик',
+          employer: 'ООО Горбилет',
+          isPulkovo: false,
+          isGorbilet: true
+        };
+        points.push(gorbiletVacancy);
+        console.log('Added ООО Горбилет vacancy:', gorbiletVacancy);
+        
+        // Аналитик данных / Data Analyst (SQL)
+        const dataAnalystVacancy = {
+          x: 150000, // Salary 150,000 ₽
+          y: 4.2, // Company rating 4.2
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Аналитик данных / Data Analyst (SQL)',
+          employer: 'StudyWorld',
+          isPulkovo: false,
+          isDataAnalyst: true
+        };
+        points.push(dataAnalystVacancy);
+        console.log('Added StudyWorld vacancy:', dataAnalystVacancy);
+        
+        // Т‑Банк - Аналитик операционных процессов (POS)
+        const tbankVacancy = {
+          x: 144000, // Salary от 144,000 ₽/месяц
+          y: 4.1, // Company rating 4.1
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Аналитик операционных процессов (POS)',
+          employer: 'Т‑Банк',
+          isPulkovo: false,
+          isTbank: true
+        };
+        points.push(tbankVacancy);
+        console.log('Added Т‑Банк vacancy:', tbankVacancy);
+      }
+      
+      // Add specific vacancies for машинист катка
+      if (query && query.toLowerCase().includes('машинист катка')) {
+        // ООО ЖЕЛДОРСТРОЙ - Машинист катка
+        const zheldorVacancy = {
+          x: 180000, // Salary 180,000 ₽
+          y: 3.5, // Company rating 3.5
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Машинист катка',
+          employer: 'ООО ЖЕЛДОРСТРОЙ',
+          isPulkovo: false,
+          isZheldor: true
+        };
+        points.push(zheldorVacancy);
+        console.log('Added ООО ЖЕЛДОРСТРОЙ vacancy:', zheldorVacancy);
+        
+        // ООО ТрансГеоСервис - Машинист катка
+        const transGeoVacancy = {
+          x: 141000, // Salary 141,000 ₽
+          y: 5.0, // Company rating 5.0
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Машинист катка',
+          employer: 'ООО ТрансГеоСервис',
+          isPulkovo: false,
+          isTransGeo: true
+        };
+        points.push(transGeoVacancy);
+        console.log('Added ООО ТрансГеоСервис vacancy:', transGeoVacancy);
       }
       
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
@@ -1282,6 +1468,19 @@ async def dashboard():
       const pobedaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Победа'));
       const teremokHighlightPoints = points.filter(p => p.employer && p.employer.includes('Теремок - Русские Блины'));
       const ozonHighlightPoints = points.filter(p => p.employer && p.employer.includes('Озон') && p.isOzonHighlight);
+      const pochtaPoints = points.filter(p => p.isPochta);
+      const magnitPoints = points.filter(p => p.isMagnit);
+      const dnsPoints = points.filter(p => p.isDNS);
+      const tokyoSitiPoints = points.filter(p => p.isTokyoSiti);
+      const bonaKaponaPoints = points.filter(p => p.isBonaKapona);
+      const delmarPoints = points.filter(p => p.isDelMar);
+      const ginzaPoints = points.filter(p => p.isGinza);
+      const radiofidPoints = points.filter(p => p.isRadiofid);
+      const gorbiletPoints = points.filter(p => p.isGorbilet);
+      const dataAnalystPoints = points.filter(p => p.isDataAnalyst);
+      const tbankPoints = points.filter(p => p.isTbank);
+      const zheldorPoints = points.filter(p => p.isZheldor);
+      const transGeoPoints = points.filter(p => p.isTransGeo);
       const otherPoints = points.filter(p => 
         !p.isPulkovo && 
         !(p.employer && p.employer.includes('Авиакомпания Россия')) &&
@@ -1290,7 +1489,20 @@ async def dashboard():
         !(p.employer && p.employer.includes('Ozon')) &&
         !(p.employer && p.employer.includes('Теремок')) &&
         !(p.employer && p.employer.includes('WILDBERRIES')) &&
-        !(p.employer && p.employer.includes('Авиакомпания Победа'))
+        !(p.employer && p.employer.includes('Авиакомпания Победа')) &&
+        !p.isPochta &&
+        !p.isMagnit &&
+        !p.isDNS &&
+        !p.isTokyoSiti &&
+        !p.isBonaKapona &&
+        !p.isDelMar &&
+        !p.isGinza &&
+        !p.isRadiofid &&
+        !p.isGorbilet &&
+        !p.isDataAnalyst &&
+        !p.isTbank &&
+        !p.isZheldor &&
+        !p.isTransGeo
       );
       
       console.log('Chart datasets:', {
@@ -1424,6 +1636,136 @@ async def dashboard():
               borderWidth: 3,
               hoverBackgroundColor: 'rgba(255, 20, 147, 0.8)',
               hoverBorderColor: 'rgba(255, 20, 147, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Почта России',
+              data: pochtaPoints,
+              backgroundColor: 'rgba(34, 139, 34, 0.6)',
+              borderColor: 'rgba(34, 139, 34, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(34, 139, 34, 0.8)',
+              hoverBorderColor: 'rgba(34, 139, 34, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Магнит',
+              data: magnitPoints,
+              backgroundColor: 'rgba(255, 69, 0, 0.6)',
+              borderColor: 'rgba(255, 69, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 69, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 69, 0, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'DNS',
+              data: dnsPoints,
+              backgroundColor: 'rgba(0, 191, 255, 0.6)',
+              borderColor: 'rgba(0, 191, 255, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(0, 191, 255, 0.8)',
+              hoverBorderColor: 'rgba(0, 191, 255, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Токио-сити',
+              data: tokyoSitiPoints,
+              backgroundColor: 'rgba(255, 140, 0, 0.6)',
+              borderColor: 'rgba(255, 140, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 140, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 140, 0, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Бона Капона',
+              data: bonaKaponaPoints,
+              backgroundColor: 'rgba(138, 43, 226, 0.6)',
+              borderColor: 'rgba(138, 43, 226, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(138, 43, 226, 0.8)',
+              hoverBorderColor: 'rgba(138, 43, 226, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'DelMar',
+              data: delmarPoints,
+              backgroundColor: 'rgba(50, 205, 50, 0.6)',
+              borderColor: 'rgba(50, 205, 50, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(50, 205, 50, 0.8)',
+              hoverBorderColor: 'rgba(50, 205, 50, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Ginza',
+              data: ginzaPoints,
+              backgroundColor: 'rgba(255, 99, 71, 0.6)',
+              borderColor: 'rgba(255, 99, 71, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 99, 71, 0.8)',
+              hoverBorderColor: 'rgba(255, 99, 71, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Радиофид',
+              data: radiofidPoints,
+              backgroundColor: 'rgba(75, 0, 130, 0.6)',
+              borderColor: 'rgba(75, 0, 130, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(75, 0, 130, 0.8)',
+              hoverBorderColor: 'rgba(75, 0, 130, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО Горбилет',
+              data: gorbiletPoints,
+              backgroundColor: 'rgba(255, 215, 0, 0.6)',
+              borderColor: 'rgba(255, 215, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 215, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 215, 0, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'StudyWorld',
+              data: dataAnalystPoints,
+              backgroundColor: 'rgba(30, 144, 255, 0.6)',
+              borderColor: 'rgba(30, 144, 255, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(30, 144, 255, 0.8)',
+              hoverBorderColor: 'rgba(30, 144, 255, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Т‑Банк',
+              data: tbankPoints,
+              backgroundColor: 'rgba(220, 20, 60, 0.6)',
+              borderColor: 'rgba(220, 20, 60, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(220, 20, 60, 0.8)',
+              hoverBorderColor: 'rgba(220, 20, 60, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО ЖЕЛДОРСТРОЙ',
+              data: zheldorPoints,
+              backgroundColor: 'rgba(139, 69, 19, 0.6)',
+              borderColor: 'rgba(139, 69, 19, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(139, 69, 19, 0.8)',
+              hoverBorderColor: 'rgba(139, 69, 19, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО ТрансГеоСервис',
+              data: transGeoPoints,
+              backgroundColor: 'rgba(0, 128, 128, 0.6)',
+              borderColor: 'rgba(0, 128, 128, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(0, 128, 128, 0.8)',
+              hoverBorderColor: 'rgba(0, 128, 128, 1)',
               hoverBorderWidth: 4
             }
           ]
@@ -1653,13 +1995,21 @@ async def dashboard():
       const presetMap = new Map([
         ['врач-терапевт', 'врач терапевт'],
         ['врач терапевт', 'врач терапевт'],
-        ['грузчик', 'грузчик склад'],
+        ['грузчик', 'грузчик нагрузки'],
+        ['грузчик нагрузки', 'грузчик нагрузки'],
         ['грузчик склад', 'грузчик склад'],
         ['водитель', 'водитель категория D'],
         ['водитель категория D', 'водитель категория D'],
         ['водитель категория С', 'водитель категория С'],
         ['уборщик', 'уборщик клининг'],
-        ['специалист сбовс', 'уборщик клининг']
+        ['специалист сбовс', 'уборщик клининг'],
+        ['мойщик-уборщик', 'мойщик посуды'],
+        ['мойщик посуды', 'мойщик посуды'],
+        ['ml-инженер', 'ML инженер'],
+        ['ml инженер', 'ML инженер'],
+        ['аналитик данных', 'Аналитик данных SQL'],
+        ['аналитик данных sql', 'Аналитик данных SQL'],
+        ['машинист катка', 'машинист катка']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
