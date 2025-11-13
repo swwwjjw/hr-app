@@ -1050,6 +1050,16 @@ async def dashboard():
       const normalizedQueryForAdd = currentQueryForAdd.toLowerCase().trim();
       const additionalPulkovoSalary = getTeamProjectAdditionalForQuery(normalizedQueryForAdd);
       
+      // For ML инженер, add Pulkovo salary (200,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('ml инженер')) {
+        pulkovoSalaries.push(200000);
+      }
+      
+      // For аналитик данных sql, add Pulkovo salary (150,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('аналитик данных sql')) {
+        pulkovoSalaries.push(150000);
+      }
+      
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
 
       // Render market scale bands and ticks if data exists
@@ -1276,6 +1286,19 @@ async def dashboard():
       
       // Add specific vacancies for ML инженер
       if (query && query.toLowerCase().includes('ml инженер')) {
+        // Pulkovo - ML Engineer / Инженер машинного обучения
+        const pulkovoMLVacancy = {
+          x: 200000, // Salary 200,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'ML Engineer / Инженер машинного обучения',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isRadiofid: false
+        };
+        points.push(pulkovoMLVacancy);
+        console.log('Added Pulkovo ML vacancy:', pulkovoMLVacancy);
+        
         // Радиофид - ML Engineer / Инженер машинного обучения
         const radiofidVacancy = {
           x: 130000, // Salary от 130,000 ₽/мес
@@ -1292,6 +1315,19 @@ async def dashboard():
       
       // Add specific vacancies for аналитик данных sql
       if (query && query.toLowerCase().includes('аналитик данных sql')) {
+        // Pulkovo - Аналитик данных
+        const pulkovoAnalystVacancy = {
+          x: 150000, // Salary 150,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Аналитик данных',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isGorbilet: false
+        };
+        points.push(pulkovoAnalystVacancy);
+        console.log('Added Pulkovo аналитик данных vacancy:', pulkovoAnalystVacancy);
+        
         // ООО Горбилет - Продуктовый аналитик
         const gorbiletVacancy = {
           x: 200000, // Salary from 200,000 ₽
