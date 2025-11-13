@@ -702,7 +702,7 @@ async def dashboard():
         return 59320;
       } else if (q.includes('машинист катка') || qSpaced.includes(' машинист ')) {
         return 59320;
-      return 0;
+      } return 0;
     }
     // Helper to strictly detect Pulkovo operator company in employer names
     function isPulkovoEmployerName(name) {
