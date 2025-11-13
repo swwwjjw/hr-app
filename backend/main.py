@@ -700,7 +700,8 @@ async def dashboard():
       } else if (q.includes('водитель категория d') || qSpaced.includes(' водитель ')) {
         // Additional for "Водитель" (категория D и общий случай)
         return 59320;
-      }
+      } else if (q.includes('машинист катка') || qSpaced.includes(' машинист ')) {
+        return 59320;
       return 0;
     }
     // Helper to strictly detect Pulkovo operator company in employer names
