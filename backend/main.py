@@ -210,6 +210,25 @@ async def fetch(
     
     if simplified:
         parsed = await parse_vacancies(filtered_items, with_employer_mark=employer_mark)
+        # Change all Metro vacancies rating to 3.4
+        for item in parsed:
+            if (item.get("employer_name") and 
+                "Петербургский Метрополитен" in item.get("employer_name", "") and
+                item.get("employer_mark") is not None):
+                item["employer_mark"] = 3.4
+        # Change all Pulkovo vacancies rating to 3.5
+        for item in parsed:
+            employer_name = item.get("employer_name", "").lower() if item.get("employer_name") else ""
+            if (employer_name and 
+                ("пулково" in employer_name or "воздушные ворота северной столицы" in employer_name) and
+                item.get("employer_mark") is not None):
+                # Change all ratings to 3.5
+                item["employer_mark"] = 3.5
+        # Filter out vacancies with title "Инспектор по досмотру"
+        parsed = [
+            item for item in parsed
+            if item.get("title") != "Инспектор по досмотру"
+        ]
         result = {"count": len(parsed), "items": parsed}
     else:
         result = {"count": len(filtered_items), "items": filtered_items}
@@ -1119,6 +1138,44 @@ async def dashboard():
           }
           const isPulkovo = isPulkovoEmployerName(v.employer_name);
           const isRossiya = v.employer_name && v.employer_name.includes('Авиакомпания Россия');
+          const isMetro = v.employer_name && v.employer_name.includes('Петербургский Метрополитен');
+          
+          // Change all Metro vacancies rating to 3.4
+          if (isMetro && rating !== null) {
+            const originalRating = rating;
+            rating = 3.4;
+            // Also update the employer_mark in the object for consistency
+            if (typeof v.employer_mark === 'number') {
+              v.employer_mark = 3.4;
+            }
+            console.log('Changed Metro vacancy rating to 3.4:', {
+              title: v.title,
+              employer: v.employer_name,
+              original_rating: originalRating,
+              new_rating: 3.4
+            });
+          }
+          
+          // Change all Pulkovo vacancies rating to 3.5
+          if (isPulkovo && rating !== null) {
+            const originalRating = rating;
+            rating = 3.5;
+            // Also update the employer_mark in the object for consistency
+            if (typeof v.employer_mark === 'number') {
+              v.employer_mark = 3.5;
+            }
+            console.log('Changed Pulkovo vacancy rating to 3.5:', {
+              title: v.title,
+              employer: v.employer_name,
+              original_rating: originalRating,
+              new_rating: 3.5
+            });
+          }
+          
+          // Exclude vacancies with title "Инспектор по досмотру"
+          if (v.title && v.title.trim() === 'Инспектор по досмотру') {
+            return null;
+          }
 
           // Add additional salary to Pulkovo vacancies only when button is active
           if (isPulkovo && monthly !== null) {
@@ -1138,8 +1195,7 @@ async def dashboard():
             return null;
           }
           // Check if it's a highlighted company that should have larger bubble size
-          const isHighlightedCompany = isPulkovo || isRossiya || 
-            (v.employer_name && v.employer_name.includes('Петербургский Метрополитен')) ||
+          const isHighlightedCompany = isPulkovo || isRossiya || isMetro ||
             (v.employer_name && v.employer_name.includes('АО Зенит-Арена')) ||
             (v.employer_name && v.employer_name.includes('Ozon')) ||
             (v.employer_name && v.employer_name.includes('Теремок')) ||
