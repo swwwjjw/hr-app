@@ -218,12 +218,13 @@ async def fetch(
                 item["employer_mark"] = 3.4
         # Change all Pulkovo vacancies rating to 3.5
         for item in parsed:
-            employer_name = item.get("employer_name", "").lower() if item.get("employer_name") else ""
-            if (employer_name and 
-                ("пулково" in employer_name or "воздушные ворота северной столицы" in employer_name) and
-                item.get("employer_mark") is not None):
-                # Change all ratings to 3.5
-                item["employer_mark"] = 3.5
+            employer_name_raw = item.get("employer_name")
+            if employer_name_raw:
+                employer_name = str(employer_name_raw).lower()
+                if (("пулково" in employer_name or "воздушные ворота северной столицы" in employer_name) and
+                    item.get("employer_mark") is not None):
+                    # Change all ratings to 3.5
+                    item["employer_mark"] = 3.5
         # Filter out vacancies with title "Инспектор по досмотру"
         parsed = [
             item for item in parsed
@@ -605,9 +606,13 @@ async def dashboard():
       <option value="">Выберите вакансию</option>
       <option value="контролер кпп">Инспектор-контролёр</option>
       <option value="безопасность досмотр">Инспектор по досмотру</option>
-      <!-- <option value="инспектор перрон">Инспектор перронного контроля</option> -->
-      <!-- <option value="гбр, охрана">Инспектор ГБР</option> -->
+      <option value="склад комплектовщик">Инспектор перронного контроля</option>
+      <option value="гбр охрана">Инспектор ГБР</option>
+      <option value="кинолог">Кинолог</option>
+      <option value="фельдшер помощь">Фельдшер</option>
+      <option value="обслуживание воздушных судов">Специалист по обслуживанию ВС</option>
       <option value="врач терапевт">Врач-терапевт</option>
+              <option value="осмотр медицинской">Медицинская сестра/медицинский брат</option>
               <option value="грузчик нагрузки">Грузчик</option>
               <option value="водитель категория D">Водитель</option>
               <!-- <option value="водитель категория С">Водитель спецтехники</option> -->
@@ -773,6 +778,28 @@ async def dashboard():
         'безопасность досмотр': 'безопасность досмотр', 
         'врач терапевт': 'врач терапевт',
         'врач-терапевт': 'врач терапевт',
+        'осмотр медицинской': 'осмотр медицинской',
+        'медицинской осмотр': 'осмотр медицинской',
+        'медицинский осмотр': 'осмотр медицинской',
+        'медицинская сестра': 'осмотр медицинской',
+        'медицинский брат': 'осмотр медицинской',
+        'гбр охрана': 'гбр охрана',
+        'охрана гбр': 'гбр охрана',
+        'группа быстрого реагирования': 'гбр охрана',
+        'инспектор гбр': 'гбр охрана',
+        'склад комплектовщик': 'склад комплектовщик',
+        'комплектовщик склад': 'склад комплектовщик',
+        'инспектор перронного контроля': 'склад комплектовщик',
+        'кинолог': 'кинолог',
+        'кинолог охранник': 'кинолог',
+        'охранник кинолог': 'кинолог',
+        'фельдшер помощь': 'фельдшер помощь',
+        'помощь фельдшер': 'фельдшер помощь',
+        'фельдшер': 'фельдшер помощь',
+        'обслуживание воздушных судов': 'обслуживание воздушных судов',
+        'воздушных судов': 'обслуживание воздушных судов',
+        'обслуживание вс': 'обслуживание воздушных судов',
+        'специалист по обслуживанию вс': 'обслуживание воздушных судов',
         'грузчик нагрузки': 'грузчик нагрузки',
         'грузчик склад': 'грузчик склад',
         'грузчик': 'грузчик нагрузки',
@@ -1079,6 +1106,50 @@ async def dashboard():
         pulkovoSalaries.push(150000);
       }
       
+      // For осмотр медицинской, add Pulkovo salary (65,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('осмотр медицинской') || 
+          normalizedQueryForAdd.includes('медицинской осмотр') ||
+          normalizedQueryForAdd.includes('медицинский осмотр') ||
+          normalizedQueryForAdd.includes('медицинская сестра') ||
+          normalizedQueryForAdd.includes('медицинский брат')) {
+        pulkovoSalaries.push(65000);
+      }
+      
+      // For гбр охрана, add Pulkovo salary (90,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('гбр охрана') || 
+          normalizedQueryForAdd.includes('охрана гбр') ||
+          normalizedQueryForAdd.includes('группа быстрого реагирования') ||
+          normalizedQueryForAdd.includes('инспектор гбр')) {
+        pulkovoSalaries.push(90000);
+      }
+      
+      // For склад комплектовщик, add Pulkovo salary (86,500) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('склад комплектовщик') || 
+          normalizedQueryForAdd.includes('комплектовщик склад') ||
+          normalizedQueryForAdd.includes('инспектор перронного контроля')) {
+        pulkovoSalaries.push(86500);
+      }
+      
+      // For кинолог, add Pulkovo salary (100,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('кинолог')) {
+        pulkovoSalaries.push(100000);
+      }
+      
+      // For фельдшер помощь, add Pulkovo salary (88,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('фельдшер помощь') || 
+          normalizedQueryForAdd.includes('помощь фельдшер') ||
+          normalizedQueryForAdd.includes('фельдшер')) {
+        pulkovoSalaries.push(88000);
+      }
+      
+      // For обслуживание воздушных судов, add Pulkovo salary (86,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('обслуживание воздушных судов') || 
+          normalizedQueryForAdd.includes('воздушных судов') ||
+          normalizedQueryForAdd.includes('обслуживание вс') ||
+          normalizedQueryForAdd.includes('специалист по обслуживанию вс')) {
+        pulkovoSalaries.push(86000);
+      }
+      
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
 
       // Render market scale bands and ticks if data exists
@@ -1201,13 +1272,40 @@ async def dashboard():
             (v.employer_name && v.employer_name.includes('Теремок')) ||
             (v.employer_name && v.employer_name.includes('WILDBERRIES'));
           
+          // Check for specific kynology companies to highlight (case-insensitive)
+          const employerNameLower = (v.employer_name || '').toString().toLowerCase();
+          const isEivas = employerNameLower.includes('эйвас') || employerNameLower.includes('ооо оп эйвас');
+          const isMukhtar = employerNameLower.includes('мухтар') || employerNameLower.includes('клуб собаководства');
+          const isDogSelf = employerNameLower.includes('dogself') || employerNameLower.includes('кинологический развивающий центр');
+          const isVysshayaShkola = employerNameLower.includes('высшая школа собак');
+          const isPulkovoTamozhnya = employerNameLower.includes('пулковская таможня');
+          const isKynologyHighlighted = isEivas || isMukhtar || isDogSelf || isVysshayaShkola || isPulkovoTamozhnya;
+          
+          // Debug logging for kynology companies
+          if (isKynologyHighlighted) {
+            console.log('Found highlighted kynology company:', {
+              employer: v.employer_name,
+              isEivas: isEivas,
+              isMukhtar: isMukhtar,
+              isDogSelf: isDogSelf,
+              isVysshayaShkola: isVysshayaShkola,
+              isPulkovoTamozhnya: isPulkovoTamozhnya,
+              title: v.title
+            });
+          }
+          
           return {
             x: monthly,
             y: rating,
-            r: isHighlightedCompany ? 12 : 6, // Larger bubble for highlighted companies
+            r: (isHighlightedCompany || isKynologyHighlighted) ? 12 : 6, // Larger bubble for highlighted companies
             title: v.title || '',
             employer: v.employer_name || '',
-            isPulkovo: isPulkovo
+            isPulkovo: isPulkovo,
+            isEivas: isEivas,
+            isMukhtar: isMukhtar,
+            isDogSelf: isDogSelf,
+            isVysshayaShkola: isVysshayaShkola,
+            isPulkovoTamozhnya: isPulkovoTamozhnya
           };
         })
         .filter(p => p !== null);
@@ -1453,6 +1551,211 @@ async def dashboard():
         console.log('Added ООО ТрансГеоСервис vacancy:', transGeoVacancy);
       }
       
+      // Add specific vacancy for осмотр медицинской
+      const queryLower = query ? query.toLowerCase() : '';
+      if (queryLower && (
+        queryLower.includes('осмотр медицинской') || 
+        queryLower.includes('медицинской осмотр') ||
+        queryLower.includes('медицинский осмотр') ||
+        queryLower.includes('медицинская сестра') ||
+        queryLower.includes('медицинский брат')
+      )) {
+        // Pulkovo - Медицинская сестра/медицинский брат
+        const pulkovoMedicalVacancy = {
+          x: 65000, // Salary 65,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Медицинская сестра/медицинский брат',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoMedical: true
+        };
+        points.push(pulkovoMedicalVacancy);
+        console.log('Added Pulkovo medical vacancy:', pulkovoMedicalVacancy);
+      }
+      
+      // Add specific vacancy for гбр охрана
+      const queryLowerGBR = query ? query.toLowerCase() : '';
+      if (queryLowerGBR && (
+        queryLowerGBR.includes('гбр охрана') || 
+        queryLowerGBR.includes('охрана гбр') ||
+        queryLowerGBR.includes('группа быстрого реагирования') ||
+        queryLowerGBR.includes('инспектор гбр')
+      )) {
+        // Pulkovo - Инспектор Группы Быстрого Реагирования
+        const pulkovoGBRVacancy = {
+          x: 90000, // Salary 90,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инспектор Группы Быстрого Реагирования',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoGBR: true
+        };
+        points.push(pulkovoGBRVacancy);
+        console.log('Added Pulkovo GBR vacancy:', pulkovoGBRVacancy);
+        
+        // ООО ЧОО Альфа-Легион Спб
+        const alfaLegionVacancy = {
+          x: 202500, // Average of 135,000-270,000 range
+          y: 3.5, // Company rating 3.5
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инспектор Группы Быстрого Реагирования',
+          employer: 'ООО ЧОО Альфа-Легион Спб',
+          isPulkovo: false,
+          isAlfaLegion: true
+        };
+        points.push(alfaLegionVacancy);
+        console.log('Added ООО ЧОО Альфа-Легион Спб vacancy:', alfaLegionVacancy);
+        
+        // ООО ЧОО К.О.П.-2
+        const kop2Vacancy = {
+          x: 68000, // Salary от 68,000 ₽
+          y: 3.5, // Company rating 3.5
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инспектор Группы Быстрого Реагирования',
+          employer: 'ООО ЧОО К.О.П.-2',
+          isPulkovo: false,
+          isKOP2: true
+        };
+        points.push(kop2Vacancy);
+        console.log('Added ООО ЧОО К.О.П.-2 vacancy:', kop2Vacancy);
+        
+        // ООО Частное охранное предприятие А-2
+        const a2Vacancy = {
+          x: 85000, // Average of 70,000-100,000 range
+          y: 4.6, // Company rating 4.6
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инспектор Группы Быстрого Реагирования',
+          employer: 'ООО Частное охранное предприятие А-2',
+          isPulkovo: false,
+          isA2: true
+        };
+        points.push(a2Vacancy);
+        console.log('Added ООО Частное охранное предприятие А-2 vacancy:', a2Vacancy);
+      }
+      
+      // Add specific vacancy for Склад комплектовщик
+      const queryLowerSklad = query ? query.toLowerCase() : '';
+      if (queryLowerSklad && (
+        queryLowerSklad.includes('склад комплектовщик') || 
+        queryLowerSklad.includes('комплектовщик склад') ||
+        queryLowerSklad.includes('инспектор перронного контроля')
+      )) {
+        // Pulkovo - Инспектор Перронного Контроля
+        const pulkovoPerronVacancy = {
+          x: 86500, // Average of 77,000-96,000 range
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инспектор Перронного Контроля',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoPerron: true
+        };
+        points.push(pulkovoPerronVacancy);
+        console.log('Added Pulkovo перронный контроль vacancy:', pulkovoPerronVacancy);
+        
+        // О'КЕЙ "Распределительный центр"
+        const okeyVacancy = {
+          x: 80000, // Average of 70,000-90,000 range
+          y: 3.8, // Company rating 3.8
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Комплектовщик',
+          employer: 'О\'КЕЙ "Распределительный центр"',
+          isPulkovo: false,
+          isOkey: true
+        };
+        points.push(okeyVacancy);
+        console.log('Added О\'КЕЙ vacancy:', okeyVacancy);
+        
+        // Major Auto (Мэйджор Авто) - Техник склада автомобилей
+        const majorAutoVacancy = {
+          x: 77500, // Average of 65,000-90,000 range
+          y: 4.1, // Company rating 4.1
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Техник склада автомобилей в официальный дилер MAJOR',
+          employer: 'Major Auto (Мэйджор Авто)',
+          isPulkovo: false,
+          isMajorAuto: true
+        };
+        points.push(majorAutoVacancy);
+        console.log('Added Major Auto vacancy:', majorAutoVacancy);
+      }
+      
+      // Add specific vacancy for кинолог
+      const queryLowerKinolog = query ? query.toLowerCase() : '';
+      if (queryLowerKinolog && queryLowerKinolog.includes('кинолог')) {
+        // Pulkovo - Кинолог
+        const pulkovoKinologVacancy = {
+          x: 100000, // Salary 100,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Кинолог',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoKinolog: true
+        };
+        points.push(pulkovoKinologVacancy);
+        console.log('Added Pulkovo кинолог vacancy:', pulkovoKinologVacancy);
+      }
+      
+      // Add specific vacancy for фельдшер помощь
+      const queryLowerFeldsher = query ? query.toLowerCase() : '';
+      if (queryLowerFeldsher && (
+        queryLowerFeldsher.includes('фельдшер помощь') || 
+        queryLowerFeldsher.includes('помощь фельдшер') ||
+        queryLowerFeldsher.includes('фельдшер')
+      )) {
+        // Pulkovo - Фельдшер
+        const pulkovoFeldsherVacancy = {
+          x: 88000, // Salary 88,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Фельдшер',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoFeldsher: true
+        };
+        points.push(pulkovoFeldsherVacancy);
+        console.log('Added Pulkovo фельдшер vacancy:', pulkovoFeldsherVacancy);
+      }
+      
+      // Add specific vacancy for обслуживание воздушных судов
+      const queryLowerVS = query ? query.toLowerCase() : '';
+      if (queryLowerVS && (
+        queryLowerVS.includes('обслуживание воздушных судов') || 
+        queryLowerVS.includes('воздушных судов') ||
+        queryLowerVS.includes('обслуживание вс') ||
+        queryLowerVS.includes('специалист по обслуживанию вс')
+      )) {
+        // Pulkovo - Специалист по обслуживанию ВС
+        const pulkovoVSVacancy = {
+          x: 86000, // Average of 84,000-88,000 range
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Специалист по обслуживанию ВС',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoVS: true
+        };
+        points.push(pulkovoVSVacancy);
+        console.log('Added Pulkovo обслуживание ВС vacancy:', pulkovoVSVacancy);
+      }
+      
+      // Add specific vacancy from Авиакомпания Россия
+      // This will appear for all queries - adjust the condition if you want it for specific queries only
+      const rossiyaHardcodedVacancy = {
+        x: 54000, // Salary 54,000 ₽
+        y: 4.0, // Default rating - adjust if needed
+        r: 12, // Same size as other highlighted companies
+        title: 'Вакансия Авиакомпания Россия', // Update with actual title
+        employer: 'Авиакомпания Россия',
+        isRossiya: true,
+        isRossiyaHardcoded: true
+      };
+      points.push(rossiyaHardcodedVacancy);
+      console.log('Added hardcoded Авиакомпания Россия vacancy:', rossiyaHardcodedVacancy);
+      
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
       // Create horizontal bar chart for candidate requirements
       const barChartContainer = document.getElementById('barChartContainer');
@@ -1551,7 +1854,7 @@ async def dashboard():
       const bubbleCtx = document.getElementById('bubbleChart');
       // Separate companies into different datasets
       const pulkovoPoints = points.filter(p => p.isPulkovo);
-      const rossiyaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Россия'));
+      const rossiyaPoints = points.filter(p => (p.employer && p.employer.includes('Авиакомпания Россия')) || p.isRossiyaHardcoded);
       const metroPoints = points.filter(p => p.employer && p.employer.includes('Петербургский Метрополитен'));
       const zenitPoints = points.filter(p => p.employer && p.employer.includes('АО Зенит-Арена'));
       const ozonPoints = points.filter(p => p.employer && p.employer.includes('Ozon'));
@@ -1573,6 +1876,27 @@ async def dashboard():
       const tbankPoints = points.filter(p => p.isTbank);
       const zheldorPoints = points.filter(p => p.isZheldor);
       const transGeoPoints = points.filter(p => p.isTransGeo);
+      const alfaLegionPoints = points.filter(p => p.isAlfaLegion);
+      const kop2Points = points.filter(p => p.isKOP2);
+      const a2Points = points.filter(p => p.isA2);
+      const okeyPoints = points.filter(p => p.isOkey);
+      const majorAutoPoints = points.filter(p => p.isMajorAuto);
+      const eivasPoints = points.filter(p => p.isEivas);
+      const mukhtarPoints = points.filter(p => p.isMukhtar);
+      const dogSelfPoints = points.filter(p => p.isDogSelf);
+      const vysshayaShkolaPoints = points.filter(p => p.isVysshayaShkola);
+      const pulkovoTamozhnyaPoints = points.filter(p => p.isPulkovoTamozhnya);
+      
+      // Debug logging for kynology company points
+      console.log('Kynology company points:', {
+        eivasCount: eivasPoints.length,
+        mukhtarCount: mukhtarPoints.length,
+        dogSelfCount: dogSelfPoints.length,
+        vysshayaShkolaCount: vysshayaShkolaPoints.length,
+        pulkovoTamozhnyaCount: pulkovoTamozhnyaPoints.length,
+        eivasSample: eivasPoints.slice(0, 2).map(p => ({ employer: p.employer, title: p.title })),
+        mukhtarSample: mukhtarPoints.slice(0, 2).map(p => ({ employer: p.employer, title: p.title }))
+      });
       const otherPoints = points.filter(p => 
         !p.isPulkovo && 
         !(p.employer && p.employer.includes('Авиакомпания Россия')) &&
@@ -1594,7 +1918,17 @@ async def dashboard():
         !p.isDataAnalyst &&
         !p.isTbank &&
         !p.isZheldor &&
-        !p.isTransGeo
+        !p.isTransGeo &&
+        !p.isAlfaLegion &&
+        !p.isKOP2 &&
+        !p.isA2 &&
+        !p.isOkey &&
+        !p.isMajorAuto &&
+        !p.isEivas &&
+        !p.isMukhtar &&
+        !p.isDogSelf &&
+        !p.isVysshayaShkola &&
+        !p.isPulkovoTamozhnya
       );
       
       console.log('Chart datasets:', {
@@ -1859,6 +2193,106 @@ async def dashboard():
               hoverBackgroundColor: 'rgba(0, 128, 128, 0.8)',
               hoverBorderColor: 'rgba(0, 128, 128, 1)',
               hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО ЧОО Альфа-Легион Спб',
+              data: alfaLegionPoints,
+              backgroundColor: 'rgba(255, 140, 0, 0.6)',
+              borderColor: 'rgba(255, 140, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 140, 0, 0.8)',
+              hoverBorderColor: 'rgba(255, 140, 0, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО ЧОО К.О.П.-2',
+              data: kop2Points,
+              backgroundColor: 'rgba(50, 205, 50, 0.6)',
+              borderColor: 'rgba(50, 205, 50, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(50, 205, 50, 0.8)',
+              hoverBorderColor: 'rgba(50, 205, 50, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО Частное охранное предприятие А-2',
+              data: a2Points,
+              backgroundColor: 'rgba(255, 20, 147, 0.6)',
+              borderColor: 'rgba(255, 20, 147, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 20, 147, 0.8)',
+              hoverBorderColor: 'rgba(255, 20, 147, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'О\'КЕЙ "Распределительный центр"',
+              data: okeyPoints,
+              backgroundColor: 'rgba(255, 20, 147, 0.6)',
+              borderColor: 'rgba(255, 20, 147, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 20, 147, 0.8)',
+              hoverBorderColor: 'rgba(255, 20, 147, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Major Auto (Мэйджор Авто)',
+              data: majorAutoPoints,
+              backgroundColor: 'rgba(0, 191, 255, 0.6)',
+              borderColor: 'rgba(0, 191, 255, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(0, 191, 255, 0.8)',
+              hoverBorderColor: 'rgba(0, 191, 255, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО ОП Эйвас',
+              data: eivasPoints,
+              backgroundColor: 'rgba(255, 0, 128, 0.7)',
+              borderColor: 'rgba(255, 0, 128, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 0, 128, 0.9)',
+              hoverBorderColor: 'rgba(255, 0, 128, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Клуб собаководства и дрессировки Мухтар',
+              data: mukhtarPoints,
+              backgroundColor: 'rgba(128, 0, 128, 0.7)',
+              borderColor: 'rgba(128, 0, 128, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(128, 0, 128, 0.9)',
+              hoverBorderColor: 'rgba(128, 0, 128, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Кинологический развивающий центр DogSelf',
+              data: dogSelfPoints,
+              backgroundColor: 'rgba(255, 165, 0, 0.7)',
+              borderColor: 'rgba(255, 165, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 165, 0, 0.9)',
+              hoverBorderColor: 'rgba(255, 165, 0, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Высшая школа собак',
+              data: vysshayaShkolaPoints,
+              backgroundColor: 'rgba(0, 255, 127, 0.7)',
+              borderColor: 'rgba(0, 255, 127, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(0, 255, 127, 0.9)',
+              hoverBorderColor: 'rgba(0, 255, 127, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Пулковская таможня',
+              data: pulkovoTamozhnyaPoints,
+              backgroundColor: 'rgba(255, 69, 0, 0.7)',
+              borderColor: 'rgba(255, 69, 0, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 69, 0, 0.9)',
+              hoverBorderColor: 'rgba(255, 69, 0, 1)',
+              hoverBorderWidth: 4
             }
           ]
         },
@@ -2087,6 +2521,19 @@ async def dashboard():
       const presetMap = new Map([
         ['врач-терапевт', 'врач терапевт'],
         ['врач терапевт', 'врач терапевт'],
+        ['осмотр медицинской', 'осмотр медицинской'],
+        ['медицинская сестра/медицинский брат', 'осмотр медицинской'],
+        ['гбр охрана', 'гбр охрана'],
+        ['инспектор гбр', 'гбр охрана'],
+        ['склад комплектовщик', 'склад комплектовщик'],
+        ['инспектор перронного контроля', 'склад комплектовщик'],
+        ['кинолог', 'кинолог'],
+        ['кинолог охранник', 'кинолог'],
+        ['охранник кинолог', 'кинолог'],
+        ['фельдшер помощь', 'фельдшер помощь'],
+        ['фельдшер', 'фельдшер помощь'],
+        ['обслуживание воздушных судов', 'обслуживание воздушных судов'],
+        ['специалист по обслуживанию вс', 'обслуживание воздушных судов'],
         ['грузчик', 'грузчик нагрузки'],
         ['грузчик нагрузки', 'грузчик нагрузки'],
         ['грузчик склад', 'грузчик склад'],
