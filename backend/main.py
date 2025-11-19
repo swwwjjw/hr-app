@@ -1248,6 +1248,22 @@ async def dashboard():
           if (v.title && v.title.trim() === 'Инспектор по досмотру') {
             return null;
           }
+          
+          // Exclude vacancies from "Нила спрингс" for грузчик queries
+          const currentQueryExclude = (query || '').toLowerCase();
+          if ((currentQueryExclude.includes('грузчик') || currentQueryExclude.includes('грузчик нагрузки')) &&
+              v.employer_name && 
+              (v.employer_name.toString().toLowerCase().includes('нила спрингс') || 
+               v.employer_name.toString().toLowerCase().includes('nila springs'))) {
+            return null;
+          }
+          
+          // Exclude vacancy "Машинист по стирке белья" for машинист катка queries
+          if (currentQueryExclude.includes('машинист катка') &&
+              v.title && 
+              v.title.toString().toLowerCase().includes('машинист по стирке белья')) {
+            return null;
+          }
 
           // Add additional salary to Pulkovo vacancies only when button is active
           if (isPulkovo && monthly !== null) {
@@ -1743,20 +1759,6 @@ async def dashboard():
         console.log('Added Pulkovo обслуживание ВС vacancy:', pulkovoVSVacancy);
       }
       
-      // Add specific vacancy from Авиакомпания Россия
-      // This will appear for all queries - adjust the condition if you want it for specific queries only
-      const rossiyaHardcodedVacancy = {
-        x: 54000, // Salary 54,000 ₽
-        y: 4.0, // Default rating - adjust if needed
-        r: 12, // Same size as other highlighted companies
-        title: 'Вакансия Авиакомпания Россия', // Update with actual title
-        employer: 'Авиакомпания Россия',
-        isRossiya: true,
-        isRossiyaHardcoded: true
-      };
-      points.push(rossiyaHardcodedVacancy);
-      console.log('Added hardcoded Авиакомпания Россия vacancy:', rossiyaHardcodedVacancy);
-      
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
       // Create horizontal bar chart for candidate requirements
       const barChartContainer = document.getElementById('barChartContainer');
@@ -1855,7 +1857,7 @@ async def dashboard():
       const bubbleCtx = document.getElementById('bubbleChart');
       // Separate companies into different datasets
       const pulkovoPoints = points.filter(p => p.isPulkovo);
-      const rossiyaPoints = points.filter(p => (p.employer && p.employer.includes('Авиакомпания Россия')) || p.isRossiyaHardcoded);
+      const rossiyaPoints = points.filter(p => p.employer && p.employer.includes('Авиакомпания Россия'));
       const metroPoints = points.filter(p => p.employer && p.employer.includes('Петербургский Метрополитен'));
       const zenitPoints = points.filter(p => p.employer && p.employer.includes('АО Зенит-Арена'));
       const ozonPoints = points.filter(p => p.employer && p.employer.includes('Ozon'));
