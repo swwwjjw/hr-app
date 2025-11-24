@@ -417,7 +417,7 @@ async def dashboard():
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Job Analytics Dashboard</title>
-  <script src="../frontend/chart.js"></script>
+  <script src="../frontend/chart.umd.js"></script>
   <script src="../frontend/wordcloud2.js"></script>
   <style>
     body { 
