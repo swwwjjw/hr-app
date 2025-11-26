@@ -621,6 +621,7 @@ async def dashboard():
               <option value="ML инженер">ML-инженер</option>
               <option value="Аналитик данных SQL">Аналитик данных</option>
               <option value="машинист катка">Машинист катка</option>
+              <option value="системный инженер">Системный инженер</option>
     </select>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
@@ -818,7 +819,9 @@ async def dashboard():
         'аналитик данных sql': 'Аналитик данных SQL',
         'аналитик данных': 'Аналитик данных SQL',
         'data analyst sql': 'Аналитик данных SQL',
-        'машинист катка': 'машинист катка'
+        'машинист катка': 'машинист катка',
+        'системный инженер': 'системный инженер',
+        'системный виртуализация': 'системный инженер'
       };
       
       // Find matching preset
@@ -1149,6 +1152,14 @@ async def dashboard():
           normalizedQueryForAdd.includes('обслуживание вс') ||
           normalizedQueryForAdd.includes('специалист по обслуживанию вс')) {
         pulkovoSalaries.push(86000);
+      }
+      
+      // For системный инженер, add Pulkovo salary (80,000) to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('системный инженер') || 
+          normalizedQueryForAdd.includes('системный виртуализация') ||
+          normalizedQueryForAdd.includes('системный виртуализац') ||
+          (normalizedQueryForAdd.includes('системный') && normalizedQueryForAdd.includes('виртуализация'))) {
+        pulkovoSalaries.push(80000);
       }
       
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
@@ -1757,6 +1768,28 @@ async def dashboard():
         };
         points.push(pulkovoVSVacancy);
         console.log('Added Pulkovo обслуживание ВС vacancy:', pulkovoVSVacancy);
+      }
+      
+      // Add specific vacancy for системный инженер
+      const queryLowerSystem = query ? query.toLowerCase() : '';
+      if (queryLowerSystem && (
+        queryLowerSystem.includes('системный инженер') || 
+        queryLowerSystem.includes('системный виртуализация') ||
+        queryLowerSystem.includes('системный виртуализац') ||
+        (queryLowerSystem.includes('системный') && queryLowerSystem.includes('виртуализация'))
+      )) {
+        // Pulkovo - Системный инженер
+        const pulkovoSystemVacancy = {
+          x: 80000, // Salary 80,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Системный инженер',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoSystem: true
+        };
+        points.push(pulkovoSystemVacancy);
+        console.log('Added Pulkovo системный инженер vacancy:', pulkovoSystemVacancy);
       }
       
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
@@ -2551,7 +2584,9 @@ async def dashboard():
         ['ml инженер', 'ML инженер'],
         ['аналитик данных', 'Аналитик данных SQL'],
         ['аналитик данных sql', 'Аналитик данных SQL'],
-        ['машинист катка', 'машинист катка']
+        ['машинист катка', 'машинист катка'],
+        ['системный инженер', 'системный инженер'],
+        ['системный виртуализация', 'системный инженер']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
