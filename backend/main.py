@@ -1154,12 +1154,12 @@ async def dashboard():
         pulkovoSalaries.push(86000);
       }
       
-      // For системный инженер, add Pulkovo salary (80,000) to pulkovoSalaries if not already present
+      // For системный инженер, add Pulkovo salary (140,000) to pulkovoSalaries if not already present
       if (normalizedQueryForAdd.includes('системный инженер') || 
           normalizedQueryForAdd.includes('системный виртуализация') ||
           normalizedQueryForAdd.includes('системный виртуализац') ||
           (normalizedQueryForAdd.includes('системный') && normalizedQueryForAdd.includes('виртуализация'))) {
-        pulkovoSalaries.push(80000);
+        pulkovoSalaries.push(140000);
       }
       
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
@@ -1780,7 +1780,7 @@ async def dashboard():
       )) {
         // Pulkovo - Системный инженер
         const pulkovoSystemVacancy = {
-          x: 80000, // Salary 80,000 ₽
+          x: 140000, // Salary 140,000 ₽
           y: 3.5, // Company rating for Pulkovo
           r: 12, // Same size as Pulkovo bubbles
           title: 'Системный инженер',
