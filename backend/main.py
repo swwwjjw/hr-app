@@ -622,6 +622,8 @@ async def dashboard():
               <option value="Аналитик данных SQL">Аналитик данных</option>
               <option value="машинист катка">Машинист катка</option>
               <option value="системный инженер">Системный инженер</option>
+              <option value="начальник склада">Инженер склада запасных частей</option>
+              <option value="инженер холодильного">Инженер холодильных установок</option>
     </select>
     <button id="toCompetitors" title="Перейти к вкладке конкурентов">К конкурентам</button>
   </div>
@@ -821,7 +823,9 @@ async def dashboard():
         'data analyst sql': 'Аналитик данных SQL',
         'машинист катка': 'машинист катка',
         'системный инженер': 'системный инженер',
-        'системный виртуализация': 'системный инженер'
+        'системный виртуализация': 'системный инженер',
+        'начальник склада': 'начальник склада',
+        'инженер холодильного': 'инженер холодильного'
       };
       
       // Find matching preset
@@ -1160,6 +1164,12 @@ async def dashboard():
           normalizedQueryForAdd.includes('системный виртуализац') ||
           (normalizedQueryForAdd.includes('системный') && normalizedQueryForAdd.includes('виртуализация'))) {
         pulkovoSalaries.push(140000);
+      }
+      
+      // For начальник склада, add Pulkovo salary to pulkovoSalaries if not already present
+      if (normalizedQueryForAdd.includes('начальник склада') || 
+          normalizedQueryForAdd.includes('инженер склада запасных частей')) {
+        pulkovoSalaries.push(98000);
       }
       
       const pulkovoAvg = pulkovoSalaries.length ? (pulkovoSalaries.reduce((a,b)=>a+b,0) / pulkovoSalaries.length) + additionalPulkovoSalary : null;
@@ -1792,6 +1802,88 @@ async def dashboard():
         console.log('Added Pulkovo системный инженер vacancy:', pulkovoSystemVacancy);
       }
       
+      // Add specific vacancy for начальник склада
+      const queryLowerSkladChief = query ? query.toLowerCase() : '';
+      if (queryLowerSkladChief && (
+        queryLowerSkladChief.includes('начальник склада') || 
+        queryLowerSkladChief.includes('инженер склада запасных частей')
+      )) {
+        // Pulkovo - Инженер склада запасных частей
+        const pulkovoSkladVacancy = {
+          x: 98000, // Salary 98,000 ₽
+          y: 3.5, // Company rating for Pulkovo
+          r: 12, // Same size as Pulkovo bubbles
+          title: 'Инженер склада запасных частей',
+          employer: 'Аэропорт Пулково',
+          isPulkovo: true,
+          isPulkovoSklad: true
+        };
+        points.push(pulkovoSkladVacancy);
+        console.log('Added Pulkovo инженер склада запасных частей vacancy:', pulkovoSkladVacancy);
+        
+        // Melon Fashion Group - Старший специалист склада / кладовщик
+        const melonVacancy = {
+          x: 107000, // Salary 107,000 ₽
+          y: 3.5, // Company rating 3.5
+          r: 12,
+          title: 'Старший специалист склада / кладовщик',
+          employer: 'Melon Fashion Group',
+          isPulkovo: false,
+          isMelon: true
+        };
+        points.push(melonVacancy);
+        console.log('Added Melon Fashion Group vacancy:', melonVacancy);
+        
+        // Фарм Дизайн - Начальник склада
+        const farmDesignVacancy = {
+          x: 161000, // Average of 150,000-172,000 range
+          y: 3.0, // Company rating 3.0
+          r: 12,
+          title: 'Начальник склада',
+          employer: 'Фарм Дизайн',
+          isPulkovo: false,
+          isFarmDesign: true
+        };
+        points.push(farmDesignVacancy);
+        console.log('Added Фарм Дизайн vacancy:', farmDesignVacancy);
+        
+        // Невилон - Начальник склада
+        const nevilionVacancy = {
+          x: 120000, // Salary от 120,000 ₽
+          y: 4.9, // Company rating 4.9
+          r: 12,
+          title: 'Начальник склада',
+          employer: 'Невилон',
+          isPulkovo: false,
+          isNevilion: true
+        };
+        points.push(nevilionVacancy);
+        console.log('Added Невилон vacancy:', nevilionVacancy);
+        
+        // ООО НОРДФИЛ - Начальник склада
+        const nordfilVacancy = {
+          x: 140000, // Average of 130,000-150,000 range
+          y: 4.3, // Company rating 4.3
+          r: 12,
+          title: 'Начальник склада',
+          employer: 'ООО НОРДФИЛ',
+          isPulkovo: false,
+          isNordfil: true
+        };
+        points.push(nordfilVacancy);
+        console.log('Added ООО НОРДФИЛ vacancy:', nordfilVacancy);
+      }
+      
+      // Add specific vacancy for инженер холодильного
+      const queryLowerRefrigerator = query ? query.toLowerCase() : '';
+      if (queryLowerRefrigerator && (
+        queryLowerRefrigerator.includes('инженер холодильного') || 
+        queryLowerRefrigerator.includes('инженер холодильных установок')
+      )) {
+        // This section can be used to add specific vacancies when needed
+        // For now, the vacancy will appear from the API search results
+      }
+      
       console.log('Bubble chart points:', { pointsCount: points.length, samplePoints: points.slice(0, 3) });
       // Create horizontal bar chart for candidate requirements
       const barChartContainer = document.getElementById('barChartContainer');
@@ -1922,6 +2014,10 @@ async def dashboard():
       const dogSelfPoints = points.filter(p => p.isDogSelf);
       const vysshayaShkolaPoints = points.filter(p => p.isVysshayaShkola);
       const pulkovoTamozhnyaPoints = points.filter(p => p.isPulkovoTamozhnya);
+      const melonPoints = points.filter(p => p.isMelon);
+      const farmDesignPoints = points.filter(p => p.isFarmDesign);
+      const nevilionPoints = points.filter(p => p.isNevilion);
+      const nordfilPoints = points.filter(p => p.isNordfil);
       
       // Debug logging for kynology company points
       console.log('Kynology company points:', {
@@ -1964,7 +2060,11 @@ async def dashboard():
         !p.isMukhtar &&
         !p.isDogSelf &&
         !p.isVysshayaShkola &&
-        !p.isPulkovoTamozhnya
+        !p.isPulkovoTamozhnya &&
+        !p.isMelon &&
+        !p.isFarmDesign &&
+        !p.isNevilion &&
+        !p.isNordfil
       );
       
       console.log('Chart datasets:', {
@@ -2329,6 +2429,46 @@ async def dashboard():
               hoverBackgroundColor: 'rgba(255, 69, 0, 0.9)',
               hoverBorderColor: 'rgba(255, 69, 0, 1)',
               hoverBorderWidth: 4
+            },
+            {
+              label: 'Melon Fashion Group',
+              data: melonPoints,
+              backgroundColor: 'rgba(255, 192, 203, 0.7)',
+              borderColor: 'rgba(255, 20, 147, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(255, 192, 203, 0.9)',
+              hoverBorderColor: 'rgba(255, 20, 147, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Фарм Дизайн',
+              data: farmDesignPoints,
+              backgroundColor: 'rgba(144, 238, 144, 0.7)',
+              borderColor: 'rgba(34, 139, 34, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(144, 238, 144, 0.9)',
+              hoverBorderColor: 'rgba(34, 139, 34, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'Невилон',
+              data: nevilionPoints,
+              backgroundColor: 'rgba(135, 206, 250, 0.7)',
+              borderColor: 'rgba(30, 144, 255, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(135, 206, 250, 0.9)',
+              hoverBorderColor: 'rgba(30, 144, 255, 1)',
+              hoverBorderWidth: 4
+            },
+            {
+              label: 'ООО НОРДФИЛ',
+              data: nordfilPoints,
+              backgroundColor: 'rgba(221, 160, 221, 0.7)',
+              borderColor: 'rgba(186, 85, 211, 1)',
+              borderWidth: 3,
+              hoverBackgroundColor: 'rgba(221, 160, 221, 0.9)',
+              hoverBorderColor: 'rgba(186, 85, 211, 1)',
+              hoverBorderWidth: 4
             }
           ]
         },
@@ -2586,7 +2726,11 @@ async def dashboard():
         ['аналитик данных sql', 'Аналитик данных SQL'],
         ['машинист катка', 'машинист катка'],
         ['системный инженер', 'системный инженер'],
-        ['системный виртуализация', 'системный инженер']
+        ['системный виртуализация', 'системный инженер'],
+        ['начальник склада', 'начальник склада'],
+        ['инженер склада запасных частей', 'начальник склада'],
+        ['инженер холодильного', 'инженер холодильного'],
+        ['инженер холодильных установок', 'инженер холодильного']
       ]);
       const mapped = presetMap.get(norm(text)) || presetMap.get(norm(raw)) || raw;
       if (mapped) {
