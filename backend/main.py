@@ -22,6 +22,7 @@ try:
         fetch_resume_ids_by_query,
     )
     from .analytics import salary_stats, top_skills, hourly_rate_stats
+    from .hh_snapshot_scheduler import install_hh_snapshot_scheduler
 except Exception:  # ModuleNotFoundError when running with --app-dir backend
     from hh_parser_ver2 import (
         fetch_vacancies,
@@ -34,8 +35,10 @@ except Exception:  # ModuleNotFoundError when running with --app-dir backend
         fetch_resume_ids_by_query,
     )
     from analytics import salary_stats, top_skills, hourly_rate_stats
+    from hh_snapshot_scheduler import install_hh_snapshot_scheduler
 
 app = FastAPI(title="Job Analytics API")
+_hh_snapshot_state = install_hh_snapshot_scheduler(app)
 
 app.add_middleware(
     CORSMiddleware,
