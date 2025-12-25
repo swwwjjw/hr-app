@@ -6,6 +6,7 @@ import os
 import json
 import hashlib
 import time
+import httpx
 from pathlib import Path
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -3109,6 +3110,46 @@ async def fetch_and_save(query: str = Query(...), area: Optional[int] = Query(No
     with out_path.open("w", encoding="utf-8") as f:
         json.dump({"query": query, "area": area, "pages": pages, "per_page": per_page, "count": len(items), "items": items}, f, ensure_ascii=False, indent=2)
     return {"saved_to": str(out_path), "count": len(items)}
+
+
+@app.post("/export_hh_vacancies_txt")
+async def export_hh_vacancies_txt(
+    text: str = Query(..., description="HH search 'text' parameter (e.g. 'python developer')"),
+    area: Optional[int] = Query(None, description="HH 'area' parameter (e.g. 1=Москва, 2=СПб)"),
+    page: int = Query(0, ge=0, le=50, description="HH 'page' parameter (0-based)"),
+    per_page: int = Query(20, ge=1, le=100, description="HH 'per_page' parameter"),
+):
+    """
+    Fetch data from https://api.hh.ru/vacancies and save the raw JSON to a .txt file in ./final_folder.
+    """
+    url = "https://api.hh.ru/vacancies"
+    params: Dict[str, Any] = {"text": text, "page": page, "per_page": per_page}
+    if area is not None:
+        params["area"] = area
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, params=params, headers={"User-Agent": "fastapi-hh-export/1.0"})
+        resp.raise_for_status()
+        data = resp.json()
+
+    base_dir = Path(__file__).resolve().parent.parent / "final_folder"
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_text = "".join([c if c.isalnum() or c in ("-", "_") else "-" for c in text.lower().strip()])[:80] or "query"
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"hh_vacancies_{safe_text}_area-{area if area is not None else 'any'}_page-{page}_pp-{per_page}_{ts}.txt"
+    out_path = base_dir / filename
+
+    with out_path.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False, indent=2))
+
+    return {
+        "saved_to": str(out_path),
+        "url": url,
+        "params": params,
+        "found": data.get("found"),
+        "items_count": len(data.get("items", []) if isinstance(data.get("items"), list) else []),
+    }
 
 
 if __name__ == '__main__':
